@@ -155,10 +155,17 @@ private:
     bool                    programs_table_available_;
     std::set<uint16_t>      known_program_pids_;
 
+    // Current iterations being built per PID
+    std::map<uint16_t, uint32_t>        current_iteration_ids_;
+    std::map<uint16_t, IterationData>   current_iterations_;
+    std::map<uint16_t, uint8_t>         last_cc_;
+
     // Internal methods
     bool validatePacket(const uint8_t* data);
     bool belongsToSameIteration(const TSPacket& p1, const TSPacket& p2);
-    void addPacketToStorage(const TSPacket& packet, uint32_t iter_id);
+    void addPacketToStorage(const TSPacket& packet);
+    void finalizeIteration(uint16_t pid);
+    void finalizeAllIterations();
     void handleDiscontinuity(uint16_t pid);
     bool tryFindValidIteration();
     void processBuffer();

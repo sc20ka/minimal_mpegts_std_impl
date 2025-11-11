@@ -14,6 +14,10 @@ MPEGTSDemuxer::MPEGTSDemuxer()
 }
 
 MPEGTSDemuxer::~MPEGTSDemuxer() {
+    // Finalize all pending iterations
+    for (const auto& [pid, _] : current_iterations_) {
+        finalizeIteration(pid);
+    }
 }
 
 void MPEGTSDemuxer::feedData(const uint8_t* data, size_t length) {
@@ -41,8 +45,10 @@ void MPEGTSDemuxer::processBuffer() {
     if (!is_synchronized_) {
         if (tryFindValidIteration()) {
             is_synchronized_ = true;
+            // Continue processing after finding sync
+        } else {
+            return; // Wait for synchronization
         }
-        return; // Wait for synchronization
     }
 
     // Process synchronized packets
@@ -66,11 +72,8 @@ void MPEGTSDemuxer::processBuffer() {
             return;
         }
 
-        // Generate iteration ID for this packet
-        uint32_t iter_id = storage_.generateIterationID();
-
-        // Add packet to storage
-        addPacketToStorage(packet, iter_id);
+        // Add packet to storage (accumulates in current iteration)
+        addPacketToStorage(packet);
 
         // Move to next packet
         sync_offset_ += MPEGTS_PACKET_SIZE;
@@ -198,7 +201,7 @@ bool MPEGTSDemuxer::belongsToSameIteration(const TSPacket& p1, const TSPacket& p
     return true;
 }
 
-void MPEGTSDemuxer::addPacketToStorage(const TSPacket& packet, uint32_t iter_id) {
+void MPEGTSDemuxer::addPacketToStorage(const TSPacket& packet) {
     const auto& header = packet.getHeader();
 
     // Filter system PIDs
@@ -213,23 +216,46 @@ void MPEGTSDemuxer::addPacketToStorage(const TSPacket& packet, uint32_t iter_id)
         }
     }
 
-    // Get or create stream for this PID
-    auto& stream = storage_.getOrCreateStream(header.pid);
+    uint16_t pid = header.pid;
 
-    // Create new iteration data
-    IterationData iter_data;
+    // Check if we need to start a new iteration
+    bool start_new_iteration = false;
 
-    // Set metadata
-    iter_data.first_cc = header.continuity_counter;
+    if (current_iterations_.find(pid) == current_iterations_.end()) {
+        // First packet for this PID
+        start_new_iteration = true;
+    } else if (header.payload_unit_start) {
+        // PUSI flag indicates start of new PES/section
+        finalizeIteration(pid);
+        start_new_iteration = true;
+    }
+
+    // Start new iteration if needed
+    if (start_new_iteration) {
+        current_iteration_ids_[pid] = storage_.generateIterationID();
+        current_iterations_[pid] = IterationData();
+        current_iterations_[pid].first_cc = header.continuity_counter;
+        current_iterations_[pid].payload_unit_start_seen = header.payload_unit_start;
+    }
+
+    // Get current iteration for this PID
+    auto& iter_data = current_iterations_[pid];
+
+    // Update metadata
     iter_data.last_cc = header.continuity_counter;
-    iter_data.packet_count = 1;
-    iter_data.payload_unit_start_seen = header.payload_unit_start;
+    iter_data.packet_count++;
 
     // Check for discontinuity
-    const auto* adapt = packet.getAdaptationField();
-    if (adapt && adapt->discontinuity_indicator) {
-        iter_data.discontinuity_detected = true;
+    if (last_cc_.find(pid) != last_cc_.end()) {
+        uint8_t expected_cc = (last_cc_[pid] + 1) % 16;
+        if (header.continuity_counter != expected_cc) {
+            const auto* adapt = packet.getAdaptationField();
+            if (adapt && adapt->discontinuity_indicator) {
+                iter_data.discontinuity_detected = true;
+            }
+        }
     }
+    last_cc_[pid] = header.continuity_counter;
 
     // Extract private data from adaptation field
     if (packet.getPrivateDataLength() > 0) {
@@ -272,9 +298,35 @@ void MPEGTSDemuxer::addPacketToStorage(const TSPacket& packet, uint32_t iter_id)
 
         iter_data.payloads.push_back(normal_segment);
     }
+}
 
-    // Add iteration to stream
-    stream.addIteration(iter_id, iter_data);
+void MPEGTSDemuxer::finalizeIteration(uint16_t pid) {
+    auto it = current_iterations_.find(pid);
+    if (it == current_iterations_.end()) {
+        return; // No current iteration
+    }
+
+    // Add iteration to storage
+    auto& stream = storage_.getOrCreateStream(pid);
+    uint32_t iter_id = current_iteration_ids_[pid];
+    stream.addIteration(iter_id, it->second);
+
+    // Clear current iteration
+    current_iterations_.erase(pid);
+    current_iteration_ids_.erase(pid);
+}
+
+void MPEGTSDemuxer::finalizeAllIterations() {
+    // Create a copy of PIDs to avoid iterator invalidation
+    std::vector<uint16_t> pids;
+    for (const auto& [pid, _] : current_iterations_) {
+        pids.push_back(pid);
+    }
+
+    // Finalize each iteration
+    for (uint16_t pid : pids) {
+        finalizeIteration(pid);
+    }
 }
 
 void MPEGTSDemuxer::handleDiscontinuity(uint16_t pid) {
@@ -282,6 +334,9 @@ void MPEGTSDemuxer::handleDiscontinuity(uint16_t pid) {
 }
 
 std::vector<ProgramInfo> MPEGTSDemuxer::getPrograms() const {
+    // Finalize pending iterations first
+    const_cast<MPEGTSDemuxer*>(this)->finalizeAllIterations();
+
     std::vector<ProgramInfo> programs;
 
     for (const auto& [pid, stream] : storage_.getAllStreams()) {
@@ -307,10 +362,16 @@ std::vector<ProgramInfo> MPEGTSDemuxer::getPrograms() const {
 }
 
 std::set<uint16_t> MPEGTSDemuxer::getDiscoveredPIDs() const {
+    // Finalize pending iterations first
+    const_cast<MPEGTSDemuxer*>(this)->finalizeAllIterations();
+
     return storage_.getDiscoveredPIDs();
 }
 
 std::vector<IterationInfo> MPEGTSDemuxer::getIterationsSummary(uint16_t pid) const {
+    // Finalize pending iterations first
+    const_cast<MPEGTSDemuxer*>(this)->finalizeAllIterations();
+
     std::vector<IterationInfo> result;
 
     const auto* stream = storage_.getStream(pid);
@@ -402,9 +463,17 @@ void MPEGTSDemuxer::clearStream(uint16_t pid) {
 }
 
 void MPEGTSDemuxer::clearAll() {
+    // Finalize all pending iterations
+    for (const auto& [pid, _] : current_iterations_) {
+        finalizeIteration(pid);
+    }
+
     storage_.clear();
     raw_buffer_.clear();
     is_synchronized_ = false;
+    current_iterations_.clear();
+    current_iteration_ids_.clear();
+    last_cc_.clear();
 }
 
 size_t MPEGTSDemuxer::getBufferOccupancy() const {
