@@ -42,29 +42,127 @@ void MPEGTSDemuxer::processBuffer() {
         if (tryFindValidIteration()) {
             is_synchronized_ = true;
         }
+        return; // Wait for synchronization
     }
 
-    // TODO: Process synchronized packets
+    // Process synchronized packets
+    while (sync_offset_ + MPEGTS_PACKET_SIZE <= raw_buffer_.size()) {
+        const uint8_t* packet_data = &raw_buffer_[sync_offset_];
+
+        // Validate sync byte
+        if (packet_data[0] != MPEGTS_SYNC_BYTE) {
+            // Lost synchronization
+            is_synchronized_ = false;
+            sync_offset_ = 0;
+            return;
+        }
+
+        // Parse packet
+        TSPacket packet;
+        if (!packet.parse(packet_data) || !packet.isValid()) {
+            // Invalid packet, try to resync
+            is_synchronized_ = false;
+            sync_offset_ = 0;
+            return;
+        }
+
+        // Generate iteration ID for this packet
+        uint32_t iter_id = storage_.generateIterationID();
+
+        // Add packet to storage
+        addPacketToStorage(packet, iter_id);
+
+        // Move to next packet
+        sync_offset_ += MPEGTS_PACKET_SIZE;
+    }
+
+    // Clean up processed data from buffer
+    if (sync_offset_ > 0) {
+        raw_buffer_.erase(raw_buffer_.begin(), raw_buffer_.begin() + sync_offset_);
+        sync_offset_ = 0;
+    }
 }
 
 bool MPEGTSDemuxer::tryFindValidIteration() {
-    // TODO: Implement 3-iteration validation algorithm
-    // This is a placeholder implementation
+    // 3-iteration validation algorithm
+    // We need to find at least 3 valid packets to confirm synchronization
 
-    // Scan for sync bytes
-    for (size_t i = 0; i + MPEGTS_PACKET_SIZE <= raw_buffer_.size(); ++i) {
-        if (raw_buffer_[i] == MPEGTS_SYNC_BYTE) {
-            // Try to validate packet
-            TSPacket packet;
-            if (packet.parse(&raw_buffer_[i])) {
-                // Found potential sync position
-                sync_offset_ = i;
+    const size_t min_buffer_for_sync = MPEGTS_PACKET_SIZE * 3;
+    if (raw_buffer_.size() < min_buffer_for_sync) {
+        return false; // Not enough data
+    }
+
+    // Scan for potential sync positions
+    for (size_t start_pos = 0;
+         start_pos + min_buffer_for_sync <= raw_buffer_.size();
+         ++start_pos) {
+
+        // Check for sync byte at this position
+        if (raw_buffer_[start_pos] != MPEGTS_SYNC_BYTE) {
+            continue;
+        }
+
+        // Try to parse first packet
+        TSPacket packet1;
+        if (!packet1.parse(&raw_buffer_[start_pos]) || !packet1.isValid()) {
+            continue;
+        }
+
+        // Search for second valid packet (adaptive search)
+        std::vector<TSPacket> candidates;
+        candidates.push_back(packet1);
+
+        size_t search_pos = start_pos + 1;
+        size_t max_search = std::min(start_pos + MPEGTS_PACKET_SIZE * 10,
+                                     raw_buffer_.size());
+
+        while (candidates.size() < sync_validation_depth_ &&
+               search_pos + MPEGTS_PACKET_SIZE <= max_search) {
+
+            if (raw_buffer_[search_pos] == MPEGTS_SYNC_BYTE) {
+                TSPacket packet_candidate;
+
+                if (packet_candidate.parse(&raw_buffer_[search_pos]) &&
+                    packet_candidate.isValid()) {
+
+                    // Check if belongs to same iteration
+                    if (candidates.empty() ||
+                        belongsToSameIteration(candidates.back(), packet_candidate)) {
+
+                        candidates.push_back(packet_candidate);
+
+                        // After finding valid packet, assume next is 188 bytes away
+                        search_pos += MPEGTS_PACKET_SIZE;
+                        continue;
+                    }
+                }
+            }
+
+            // Adaptive skip: move one byte forward
+            search_pos++;
+        }
+
+        // Check if we found 3 valid packets
+        if (candidates.size() >= sync_validation_depth_) {
+            // Verify they form a consistent sequence
+            bool valid_sequence = true;
+
+            for (size_t i = 1; i < candidates.size(); ++i) {
+                if (!belongsToSameIteration(candidates[i-1], candidates[i])) {
+                    valid_sequence = false;
+                    break;
+                }
+            }
+
+            if (valid_sequence) {
+                // Found valid synchronization point!
+                sync_offset_ = start_pos;
                 return true;
             }
         }
     }
 
-    return false;
+    return false; // No valid sync position found
 }
 
 bool MPEGTSDemuxer::validatePacket(const uint8_t* data) {
@@ -115,8 +213,68 @@ void MPEGTSDemuxer::addPacketToStorage(const TSPacket& packet, uint32_t iter_id)
         }
     }
 
-    // TODO: Add packet data to storage
-    // This is a placeholder
+    // Get or create stream for this PID
+    auto& stream = storage_.getOrCreateStream(header.pid);
+
+    // Create new iteration data
+    IterationData iter_data;
+
+    // Set metadata
+    iter_data.first_cc = header.continuity_counter;
+    iter_data.last_cc = header.continuity_counter;
+    iter_data.packet_count = 1;
+    iter_data.payload_unit_start_seen = header.payload_unit_start;
+
+    // Check for discontinuity
+    const auto* adapt = packet.getAdaptationField();
+    if (adapt && adapt->discontinuity_indicator) {
+        iter_data.discontinuity_detected = true;
+    }
+
+    // Extract private data from adaptation field
+    if (packet.getPrivateDataLength() > 0) {
+        const uint8_t* private_data = packet.getPrivateData();
+        size_t private_len = packet.getPrivateDataLength();
+
+        // Store private data in buffer
+        size_t offset = iter_data.payload_data.size();
+        iter_data.payload_data.insert(iter_data.payload_data.end(),
+                                      private_data,
+                                      private_data + private_len);
+
+        // Create segment pointing to stored data
+        PayloadSegment private_segment;
+        private_segment.type = PayloadType::PAYLOAD_PRIVATE;
+        private_segment.data = nullptr; // Will be set after adding to storage
+        private_segment.length = private_len;
+        private_segment.offset_in_stream = offset;
+
+        iter_data.payloads.push_back(private_segment);
+    }
+
+    // Extract normal payload
+    if (packet.hasPayload() && packet.getPayloadSize() > 0) {
+        const uint8_t* payload = packet.getPayload();
+        size_t payload_len = packet.getPayloadSize();
+
+        // Store payload data in buffer
+        size_t offset = iter_data.payload_data.size();
+        iter_data.payload_data.insert(iter_data.payload_data.end(),
+                                      payload,
+                                      payload + payload_len);
+
+        // Create segment pointing to stored data
+        PayloadSegment normal_segment;
+        normal_segment.type = PayloadType::PAYLOAD_NORMAL;
+        normal_segment.data = nullptr; // Will be set after adding to storage
+        normal_segment.length = payload_len;
+        normal_segment.offset_in_stream = offset;
+
+        iter_data.payloads.push_back(normal_segment);
+    }
+
+    // Add iteration to stream
+    stream.addIteration(iter_id, iter_data);
 }
 
 void MPEGTSDemuxer::handleDiscontinuity(uint16_t pid) {

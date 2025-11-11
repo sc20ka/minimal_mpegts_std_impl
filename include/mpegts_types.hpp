@@ -71,6 +71,7 @@ struct PayloadSegment {
  */
 struct IterationData {
     std::vector<PayloadSegment> payloads;           ///< Payload segments
+    std::vector<uint8_t>        payload_data;       ///< Actual payload data storage
 
     // Flags
     bool    discontinuity_detected;                 ///< CC discontinuity detected?

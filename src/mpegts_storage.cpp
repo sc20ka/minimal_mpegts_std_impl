@@ -13,7 +13,17 @@ StreamIterations::StreamIterations(uint16_t pid)
 }
 
 void StreamIterations::addIteration(uint32_t iter_id, const IterationData& data) {
-    iterations_.emplace_back(iter_id, data);
+    // Make a copy of iteration data
+    IterationData iter_copy = data;
+
+    // Fix payload segment pointers to point to the copied data
+    for (auto& segment : iter_copy.payloads) {
+        if (segment.offset_in_stream < iter_copy.payload_data.size()) {
+            segment.data = &iter_copy.payload_data[segment.offset_in_stream];
+        }
+    }
+
+    iterations_.emplace_back(iter_id, std::move(iter_copy));
 
     // Track observed CC values
     observed_cc_values_.insert(data.first_cc);
