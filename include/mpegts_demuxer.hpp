@@ -4,8 +4,11 @@
 #include "mpegts_types.hpp"
 #include "mpegts_storage.hpp"
 #include "mpegts_packet.hpp"
+#include "mpegts_psi.hpp"
 #include <vector>
 #include <memory>
+#include <optional>
+#include <map>
 
 namespace mpegts {
 
@@ -160,6 +163,12 @@ private:
     std::map<uint16_t, IterationData>   current_iterations_;
     std::map<uint16_t, uint8_t>         last_cc_;
 
+    // PSI (Program Specific Information) support
+    PSIAccumulator                      pat_accumulator_;
+    std::map<uint16_t, PSIAccumulator>  pmt_accumulators_;
+    std::optional<PAT>                  parsed_pat_;
+    std::map<uint16_t, PMT>             parsed_pmts_;  // key: program_number
+
     // Internal methods
     bool validatePacket(const uint8_t* data);
     bool belongsToSameIteration(const TSPacket& p1, const TSPacket& p2);
@@ -169,6 +178,7 @@ private:
     void handleDiscontinuity(uint16_t pid);
     bool tryFindValidIteration();
     void processBuffer();
+    void processPSIPacket(const TSPacket& packet);
 };
 
 } // namespace mpegts

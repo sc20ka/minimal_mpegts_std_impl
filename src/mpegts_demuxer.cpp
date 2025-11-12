@@ -72,6 +72,9 @@ void MPEGTSDemuxer::processBuffer() {
             return;
         }
 
+        // Process PSI packets (PAT/PMT)
+        processPSIPacket(packet);
+
         // Add packet to storage (accumulates in current iteration)
         addPacketToStorage(packet);
 
@@ -339,22 +342,55 @@ std::vector<ProgramInfo> MPEGTSDemuxer::getPrograms() const {
 
     std::vector<ProgramInfo> programs;
 
-    for (const auto& [pid, stream] : storage_.getAllStreams()) {
-        if (isProgramStream(pid)) {
+    // If we have parsed PMTs, use them to build program information
+    if (!parsed_pmts_.empty()) {
+        for (const auto& [prog_num, pmt] : parsed_pmts_) {
             ProgramInfo info;
-            info.program_number = 0; // Unknown without PAT/PMT
-            info.stream_pids.push_back(pid);
-            info.iteration_count = stream.getIterationCount();
-            info.has_discontinuity = stream.hasDiscontinuity();
+            info.program_number = prog_num;
 
-            // Calculate total payload size
-            for (const auto& [iter_id, iter_data] : stream.getIterations()) {
-                for (const auto& payload : iter_data.payloads) {
-                    info.total_payload_size += payload.length;
+            // Add all elementary stream PIDs from PMT
+            for (const auto& stream_info : pmt.streams) {
+                info.stream_pids.push_back(stream_info.elementary_pid);
+
+                // Collect statistics from storage if available
+                const auto* stream = storage_.getStream(stream_info.elementary_pid);
+                if (stream) {
+                    info.iteration_count += stream->getIterationCount();
+                    if (stream->hasDiscontinuity()) {
+                        info.has_discontinuity = true;
+                    }
+
+                    // Calculate total payload size
+                    for (const auto& [iter_id, iter_data] : stream->getIterations()) {
+                        for (const auto& payload : iter_data.payloads) {
+                            info.total_payload_size += payload.length;
+                        }
+                    }
                 }
             }
 
             programs.push_back(info);
+        }
+    }
+    // Fallback: if no PMT parsed, return discovered PIDs as separate programs
+    else {
+        for (const auto& [pid, stream] : storage_.getAllStreams()) {
+            if (isProgramStream(pid)) {
+                ProgramInfo info;
+                info.program_number = 0; // Unknown without PAT/PMT
+                info.stream_pids.push_back(pid);
+                info.iteration_count = stream.getIterationCount();
+                info.has_discontinuity = stream.hasDiscontinuity();
+
+                // Calculate total payload size
+                for (const auto& [iter_id, iter_data] : stream.getIterations()) {
+                    for (const auto& payload : iter_data.payloads) {
+                        info.total_payload_size += payload.length;
+                    }
+                }
+
+                programs.push_back(info);
+            }
         }
     }
 
@@ -496,6 +532,56 @@ void MPEGTSDemuxer::setProgramsTable(const ProgramTable& table) {
 
     // Clear existing data
     storage_.clear();
+}
+
+void MPEGTSDemuxer::processPSIPacket(const TSPacket& packet) {
+    const auto& header = packet.getHeader();
+
+    // Check if this is a PAT packet (PID 0x0000)
+    if (header.pid == 0x0000 && packet.hasPayload()) {
+        const uint8_t* payload = packet.getPayload();
+        size_t payload_len = packet.getPayloadSize();
+
+        // Add data to PAT accumulator
+        if (pat_accumulator_.addData(payload, payload_len, header.payload_unit_start)) {
+            // Section complete, try to parse PAT
+            std::vector<uint8_t> section;
+            if (pat_accumulator_.getSection(section) > 0) {
+                PAT pat;
+                if (PSIParser::parsePAT(section.data(), section.size(), pat)) {
+                    // Successfully parsed PAT
+                    parsed_pat_ = pat;
+
+                    // Create accumulators for discovered PMT PIDs
+                    for (const auto& entry : pat.programs) {
+                        if (entry.program_number != 0) {  // Skip NIT
+                            pmt_accumulators_[entry.pid] = PSIAccumulator();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Check if this is a PMT packet (discovered from PAT)
+    else if (pmt_accumulators_.find(header.pid) != pmt_accumulators_.end() &&
+             packet.hasPayload()) {
+        const uint8_t* payload = packet.getPayload();
+        size_t payload_len = packet.getPayloadSize();
+
+        // Add data to PMT accumulator
+        auto& pmt_acc = pmt_accumulators_[header.pid];
+        if (pmt_acc.addData(payload, payload_len, header.payload_unit_start)) {
+            // Section complete, try to parse PMT
+            std::vector<uint8_t> section;
+            if (pmt_acc.getSection(section) > 0) {
+                PMT pmt;
+                if (PSIParser::parsePMT(section.data(), section.size(), pmt)) {
+                    // Successfully parsed PMT
+                    parsed_pmts_[pmt.program_number] = pmt;
+                }
+            }
+        }
+    }
 }
 
 } // namespace mpegts

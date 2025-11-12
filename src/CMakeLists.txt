@@ -4,6 +4,7 @@ set(MPEGTS_SOURCES
     mpegts_demuxer.cpp
     mpegts_storage.cpp
     mpegts_packet.cpp
+    mpegts_psi.cpp
 )
 
 set(MPEGTS_HEADERS
@@ -11,6 +12,7 @@ set(MPEGTS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/mpegts_storage.hpp
     ${PROJECT_SOURCE_DIR}/include/mpegts_packet.hpp
     ${PROJECT_SOURCE_DIR}/include/mpegts_types.hpp
+    ${PROJECT_SOURCE_DIR}/include/mpegts_psi.hpp
 )
 
 # Create static library

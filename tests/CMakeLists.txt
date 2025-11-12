@@ -27,6 +27,10 @@ add_executable(test_synchronization
     test_synchronization.cpp
 )
 
+add_executable(test_psi_tables
+    test_psi_tables.cpp
+)
+
 # Link tests with library
 target_link_libraries(test_demuxer_basic PRIVATE
     mpegts_demuxer
@@ -43,11 +47,17 @@ target_link_libraries(test_synchronization PRIVATE
     test_utils
 )
 
+target_link_libraries(test_psi_tables PRIVATE
+    mpegts_demuxer
+    test_utils
+)
+
 # Set output directory
 set_target_properties(
     test_demuxer_basic
     test_demuxer_scenarios
     test_synchronization
+    test_psi_tables
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
 )
@@ -57,3 +67,4 @@ enable_testing()
 add_test(NAME BasicDemuxerTests COMMAND test_demuxer_basic)
 add_test(NAME ScenarioTests COMMAND test_demuxer_scenarios)
 add_test(NAME SynchronizationTests COMMAND test_synchronization)
+add_test(NAME PSITableTests COMMAND test_psi_tables)
