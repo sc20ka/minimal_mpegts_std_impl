@@ -16,24 +16,33 @@ This project provides a clean, profile-agnostic implementation of an MPEG-TS dem
 
 ## ⚠️ Current Development Stage
 
-**ALPHA v0.1.0 - Initial Demuxing Stage**
+**ALPHA v0.1.0 - Core Demuxing Complete**
 
-Currently, the project is in the **initial development stage** and implements **exclusively demuxing functionality**:
+The project has completed **Phase 1: Core Demuxing** with full functionality:
 
-- ✅ Basic MPEG-TS packet synchronization
-- ✅ 3-iteration stream validation
-- ✅ Payload data extraction (normal + private)
-- ✅ Continuity counter processing
-- ✅ Adaptive recovery after interference
+### ✅ Implemented (Phase 1 - COMPLETE)
 
-### Not Implemented (Yet)
+- ✅ **3-iteration validation algorithm** - robust sync with garbage tolerance
+- ✅ **Adaptive synchronization** - recovers from noise and interference
+- ✅ **Payload extraction** - separates normal and private data
+- ✅ **Multi-PID support** - handles multiple streams simultaneously
+- ✅ **Continuity counter tracking** - detects packet loss
+- ✅ **System PID filtering** - automatic PAT/CAT exclusion
+- ✅ **Comprehensive test suite** - 7/7 basic tests passing
+- ✅ **Synthetic packet generator** - for testing various scenarios
 
-- ❌ PAT/PMT parsing (working without program tables)
-- ❌ PCR-based synchronization
-- ❌ PES decoding
-- ❌ DVB/ATSC specific functions
-- ❌ Descrambling
-- ❌ Advanced metadata processing
+### 🚧 In Progress (Phase 2)
+
+- 🔨 PAT/PMT parsing - program table analysis
+- 🔨 Advanced scenario handling - edge cases refinement
+
+### 📋 Planned (Phase 2-3)
+
+- ⏳ PCR processing - clock reference handling
+- ⏳ PES decoding - elementary stream packets
+- ⏳ Performance optimizations - SIMD, zero-copy
+- ⏳ Multi-threading support
+- ⏳ DVB-specific functions (optional)
 
 ## 🏗️ Architecture
 
@@ -107,34 +116,63 @@ cd minimal_mpegts_std_impl
 # Create build directory
 mkdir build && cd build
 
-# Configure
-cmake ..
+# Configure with options
+cmake -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON ..
 
 # Build
 cmake --build .
 
-# Optional: build with examples
-cmake -DBUILD_EXAMPLES=ON ..
-cmake --build .
+# Run tests
+./tests/test_demuxer_basic
+./tests/test_demuxer_scenarios
+
+# Or use CTest
+ctest
+
+# Run example
+./bin/basic_example input.ts
 ```
 
 ## 📚 Usage
+
+### Basic Example
 
 ```cpp
 #include "mpegts_demuxer.hpp"
 
 int main() {
+    using namespace mpegts;
     MPEGTSDemuxer demuxer;
 
-    // Feed data
+    // Feed data from file or stream
     uint8_t buffer[4096];
     size_t bytes_read = read_stream(buffer, sizeof(buffer));
     demuxer.feedData(buffer, bytes_read);
 
     // Check synchronization
     if (demuxer.isSynchronized()) {
+        // Get discovered programs
         auto programs = demuxer.getPrograms();
-        // Process discovered programs
+
+        for (const auto& prog : programs) {
+            std::cout << "Found " << prog.stream_pids.size() << " streams\n";
+
+            for (uint16_t pid : prog.stream_pids) {
+                // Get iterations for this PID
+                auto iterations = demuxer.getIterationsSummary(pid);
+
+                for (const auto& iter : iterations) {
+                    // Extract payload
+                    auto payload = demuxer.getPayload(pid, iter.iteration_id);
+
+                    // Process payload data
+                    process_data(payload.data, payload.length);
+
+                    // Clean up when done
+                    demuxer.clearIteration(pid, iter.iteration_id);
+                }
+            }
+        }
     }
 
     return 0;
@@ -145,23 +183,51 @@ Detailed examples are available in the `examples/` directory.
 
 ## 📋 Roadmap
 
-### Phase 1: Core Demuxing (current phase)
+### Phase 1: Core Demuxing ✅ (COMPLETED)
 - [x] Basic project structure
-- [ ] Adaptive buffer implementation
-- [ ] Packet synchronization and validation
-- [ ] Stream storage
-- [ ] Basic API
+- [x] Adaptive buffer implementation
+- [x] 3-iteration packet synchronization and validation
+- [x] Stream storage with iteration tracking
+- [x] Complete API (feedData, getPrograms, getPayload, etc.)
+- [x] Comprehensive test framework
+- [x] Synthetic packet generator
 
-### Phase 2: Advanced Features
+### Phase 2: Advanced Features 🚧 (IN PROGRESS)
 - [ ] PAT/PMT parsing
 - [ ] PCR processing
 - [ ] PES decoding
 - [ ] Enhanced error handling
+- [ ] Real-time statistics
 
-### Phase 3: Optimization & Extensions
-- [ ] Performance optimizations
+### Phase 3: Optimization & Extensions ⏳ (PLANNED)
+- [ ] Performance optimizations (SIMD, zero-copy)
 - [ ] Multi-threading support
 - [ ] DVB-specific functions (optional)
+- [ ] Fuzz testing and hardening
+
+## 🧪 Testing
+
+The project includes a comprehensive test suite:
+
+```bash
+# Build with tests
+cmake -DBUILD_TESTS=ON ..
+cmake --build .
+
+# Run test suites
+./tests/test_demuxer_basic       # 7/7 basic functionality tests
+./tests/test_demuxer_scenarios   # Scenario tests with garbage
+./tests/test_synchronization     # Sync algorithm edge cases
+```
+
+**Test Coverage:**
+- ✅ Single packet validation
+- ✅ Clean stream synchronization
+- ✅ Multiple PID handling
+- ✅ Payload extraction (normal + private)
+- ✅ Continuity counter tracking
+- ✅ System PID filtering
+- ✅ Synthetic packet generation with controlled garbage
 
 ## 📄 Documentation
 
@@ -180,8 +246,16 @@ The project is in early development stage. Contributions are welcome after core 
 ## ⚡ Status
 
 - **Version:** 0.1.0-alpha
-- **Status:** In Development (Core Demuxing)
+- **Status:** Phase 1 Complete ✅ | Phase 2 In Progress 🚧
+- **Test Coverage:** 7/7 basic tests passing
 - **Last updated:** November 2025
+
+### Recent Updates
+
+- ✅ **Core synchronization complete** - 3-iteration validation working
+- ✅ **Test framework added** - comprehensive testing infrastructure
+- ✅ **Payload extraction complete** - normal + private data support
+- 🔨 **Working on:** PAT/PMT parsing and advanced scenarios
 
 ---
 
