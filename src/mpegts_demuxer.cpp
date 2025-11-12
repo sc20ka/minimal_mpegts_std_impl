@@ -15,10 +15,8 @@ MPEGTSDemuxer::MPEGTSDemuxer()
 }
 
 MPEGTSDemuxer::~MPEGTSDemuxer() {
-    // Finalize all pending iterations
-    for (const auto& [pid, _] : current_iterations_) {
-        finalizeIteration(pid);
-    }
+    // Finalize all pending iterations using safe method
+    finalizeAllIterations();
 }
 
 void MPEGTSDemuxer::feedData(const uint8_t* data, size_t length) {
