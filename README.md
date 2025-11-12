@@ -16,9 +16,9 @@ This project provides a clean, profile-agnostic implementation of an MPEG-TS dem
 
 ## ⚠️ Current Development Stage
 
-**ALPHA v0.1.0 - Core Demuxing Complete**
+**BETA v0.2.0 - Advanced Features Complete**
 
-The project has completed **Phase 1: Core Demuxing** with full functionality:
+The project has completed **Phase 2: Advanced Features** with comprehensive MPEG-TS support!
 
 ### ✅ Implemented (Phase 1 - COMPLETE)
 
@@ -31,18 +31,22 @@ The project has completed **Phase 1: Core Demuxing** with full functionality:
 - ✅ **Comprehensive test suite** - 7/7 basic tests passing
 - ✅ **Synthetic packet generator** - for testing various scenarios
 
-### 🚧 In Progress (Phase 2)
+### ✅ Implemented (Phase 2 - COMPLETE)
 
-- 🔨 PAT/PMT parsing - program table analysis
-- 🔨 Advanced scenario handling - edge cases refinement
+- ✅ **PAT/PMT parsing** - full program table analysis with CRC-32 validation
+- ✅ **PCR processing** - Program Clock Reference extraction, tracking, and interpolation
+- ✅ **PES decoding** - Packetized Elementary Stream parsing with PTS/DTS timestamps
+- ✅ **Enhanced test coverage** - 44/44 core tests passing (Basic: 7, PSI: 6, PCR: 13, PES: 18)
+- ✅ **Stream type detection** - automatic video/audio stream identification
+- ✅ **Multi-packet accumulation** - handles sections/packets spanning multiple TS packets
 
-### 📋 Planned (Phase 2-3)
+### 📋 Planned (Phase 3)
 
-- ⏳ PCR processing - clock reference handling
-- ⏳ PES decoding - elementary stream packets
-- ⏳ Performance optimizations - SIMD, zero-copy
-- ⏳ Multi-threading support
-- ⏳ DVB-specific functions (optional)
+- ⏳ Performance optimizations - SIMD, zero-copy operations
+- ⏳ Multi-threading support - parallel stream processing
+- ⏳ DVB-specific functions (optional) - service descriptors, EIT
+- ⏳ Real-time statistics - bitrate, jitter, continuity errors
+- ⏳ Advanced error handling - enhanced recovery strategies
 
 ## 🏗️ Architecture
 
@@ -192,16 +196,18 @@ Detailed examples are available in the `examples/` directory.
 - [x] Comprehensive test framework
 - [x] Synthetic packet generator
 
-### Phase 2: Advanced Features 🚧 (IN PROGRESS)
-- [ ] PAT/PMT parsing
-- [ ] PCR processing
-- [ ] PES decoding
-- [ ] Enhanced error handling
-- [ ] Real-time statistics
+### Phase 2: Advanced Features ✅ (COMPLETED)
+- [x] PAT/PMT parsing with CRC-32 validation
+- [x] PCR processing (extraction, tracking, interpolation, jitter detection)
+- [x] PES decoding (header parsing, PTS/DTS extraction, multi-packet accumulation)
+- [x] Stream type detection (video/audio identification)
+- [x] Comprehensive test coverage (44/44 tests passing)
 
 ### Phase 3: Optimization & Extensions ⏳ (PLANNED)
 - [ ] Performance optimizations (SIMD, zero-copy)
 - [ ] Multi-threading support
+- [ ] Real-time statistics (bitrate, jitter, errors)
+- [ ] Enhanced error handling
 - [ ] DVB-specific functions (optional)
 - [ ] Fuzz testing and hardening
 
@@ -216,17 +222,18 @@ cmake --build .
 
 # Run test suites
 ./tests/test_demuxer_basic       # 7/7 basic functionality tests
+./tests/test_psi_tables          # 6/6 PSI table parsing tests
+./tests/test_pcr                 # 13/13 PCR processing tests
+./tests/test_pes                 # 18/18 PES decoding tests
 ./tests/test_demuxer_scenarios   # Scenario tests with garbage
 ./tests/test_synchronization     # Sync algorithm edge cases
 ```
 
-**Test Coverage:**
-- ✅ Single packet validation
-- ✅ Clean stream synchronization
-- ✅ Multiple PID handling
-- ✅ Payload extraction (normal + private)
-- ✅ Continuity counter tracking
-- ✅ System PID filtering
+**Test Coverage (44/44 passing):**
+- ✅ Core Demuxing (7 tests) - packet validation, synchronization, multi-PID, payload extraction
+- ✅ PSI Tables (6 tests) - PAT/PMT parsing, CRC-32 validation, section accumulation
+- ✅ PCR Processing (13 tests) - extraction, tracking, interpolation, jitter detection
+- ✅ PES Decoding (18 tests) - header parsing, PTS/DTS extraction, packet accumulation
 - ✅ Synthetic packet generation with controlled garbage
 
 ## 📄 Documentation
@@ -245,17 +252,18 @@ The project is in early development stage. Contributions are welcome after core 
 
 ## ⚡ Status
 
-- **Version:** 0.1.0-alpha
-- **Status:** Phase 1 Complete ✅ | Phase 2 In Progress 🚧
-- **Test Coverage:** 7/7 basic tests passing
+- **Version:** 0.2.0-beta
+- **Status:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 Planned ⏳
+- **Test Coverage:** 44/44 core tests passing (100%)
 - **Last updated:** November 2025
 
 ### Recent Updates
 
-- ✅ **Core synchronization complete** - 3-iteration validation working
-- ✅ **Test framework added** - comprehensive testing infrastructure
-- ✅ **Payload extraction complete** - normal + private data support
-- 🔨 **Working on:** PAT/PMT parsing and advanced scenarios
+- ✅ **Phase 2 COMPLETE** - PAT/PMT, PCR, and PES fully implemented
+- ✅ **PES decoding added** - PTS/DTS timestamps, stream type detection
+- ✅ **PCR processing added** - clock reference tracking and interpolation
+- ✅ **PAT/PMT parsing complete** - program table analysis with CRC-32
+- ✅ **Enhanced test coverage** - 44 comprehensive tests across all modules
 
 ---
 
