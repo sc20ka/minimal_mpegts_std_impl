@@ -6,6 +6,7 @@ set(MPEGTS_SOURCES
     mpegts_packet.cpp
     mpegts_psi.cpp
     mpegts_pcr.cpp
+    mpegts_pes.cpp
 )
 
 set(MPEGTS_HEADERS
@@ -15,6 +16,7 @@ set(MPEGTS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/mpegts_types.hpp
     ${PROJECT_SOURCE_DIR}/include/mpegts_psi.hpp
     ${PROJECT_SOURCE_DIR}/include/mpegts_pcr.hpp
+    ${PROJECT_SOURCE_DIR}/include/mpegts_pes.hpp
 )
 
 # Create static library
