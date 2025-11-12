@@ -9,6 +9,7 @@ MPEGTSDemuxer::MPEGTSDemuxer()
     , sync_offset_(0)
     , sync_validation_depth_(3)
     , programs_table_available_(false)
+    , total_packets_processed_(0)
 {
     raw_buffer_.reserve(MAX_BUFFER_SIZE);
 }
@@ -75,11 +76,15 @@ void MPEGTSDemuxer::processBuffer() {
         // Process PSI packets (PAT/PMT)
         processPSIPacket(packet);
 
+        // Process PCR if present
+        processPCR(packet);
+
         // Add packet to storage (accumulates in current iteration)
         addPacketToStorage(packet);
 
         // Move to next packet
         sync_offset_ += MPEGTS_PACKET_SIZE;
+        total_packets_processed_++;
     }
 
     // Clean up processed data from buffer
@@ -582,6 +587,53 @@ void MPEGTSDemuxer::processPSIPacket(const TSPacket& packet) {
             }
         }
     }
+}
+
+void MPEGTSDemuxer::processPCR(const TSPacket& packet) {
+    const auto& header = packet.getHeader();
+
+    // Check if packet has adaptation field with PCR
+    const auto* adaptation = packet.getAdaptationField();
+    if (!adaptation || !adaptation->pcr_flag) {
+        return;
+    }
+
+    // Create PCR from parsed adaptation field data
+    PCR pcr(adaptation->pcr_base, adaptation->pcr_extension);
+
+    // Validate and add to manager
+    if (pcr.isValid()) {
+        pcr_manager_.addPCR(header.pid, pcr,
+                           total_packets_processed_, header.continuity_counter);
+    }
+}
+
+// ============================================================================
+// PCR API Methods
+// ============================================================================
+
+std::optional<PCRStats> MPEGTSDemuxer::getPCRStats(uint16_t pid) const {
+    const PCRTracker* tracker = pcr_manager_.getTracker(pid);
+    if (tracker) {
+        return tracker->getStats();
+    }
+    return std::nullopt;
+}
+
+std::vector<PCRStats> MPEGTSDemuxer::getAllPCRStats() const {
+    return pcr_manager_.getAllStats();
+}
+
+std::vector<uint16_t> MPEGTSDemuxer::getPIDsWithPCR() const {
+    return pcr_manager_.getPIDsWithPCR();
+}
+
+std::optional<PCR> MPEGTSDemuxer::getLastPCR(uint16_t pid) const {
+    const PCRTracker* tracker = pcr_manager_.getTracker(pid);
+    if (tracker) {
+        return tracker->getLastPCR();
+    }
+    return std::nullopt;
 }
 
 } // namespace mpegts

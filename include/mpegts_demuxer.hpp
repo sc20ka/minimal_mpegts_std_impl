@@ -5,6 +5,7 @@
 #include "mpegts_storage.hpp"
 #include "mpegts_packet.hpp"
 #include "mpegts_psi.hpp"
+#include "mpegts_pcr.hpp"
 #include <vector>
 #include <memory>
 #include <optional>
@@ -146,6 +147,36 @@ public:
      */
     bool hasProgramsTable() const { return programs_table_available_; }
 
+    // ========================================================================
+    // PCR (Program Clock Reference) Support
+    // ========================================================================
+
+    /**
+     * @brief Get PCR statistics for a PID
+     * @param pid Stream PID
+     * @return PCR statistics if available
+     */
+    std::optional<PCRStats> getPCRStats(uint16_t pid) const;
+
+    /**
+     * @brief Get all PCR statistics
+     * @return Vector of PCR stats for all streams with PCR
+     */
+    std::vector<PCRStats> getAllPCRStats() const;
+
+    /**
+     * @brief Get PIDs that have PCR data
+     * @return Vector of PIDs
+     */
+    std::vector<uint16_t> getPIDsWithPCR() const;
+
+    /**
+     * @brief Get last PCR value for a PID
+     * @param pid Stream PID
+     * @return Last PCR value if available
+     */
+    std::optional<PCR> getLastPCR(uint16_t pid) const;
+
 private:
     // Internal state
     DemuxerStreamStorage    storage_;
@@ -169,6 +200,10 @@ private:
     std::optional<PAT>                  parsed_pat_;
     std::map<uint16_t, PMT>             parsed_pmts_;  // key: program_number
 
+    // PCR (Program Clock Reference) support
+    PCRManager                          pcr_manager_;
+    uint64_t                            total_packets_processed_;
+
     // Internal methods
     bool validatePacket(const uint8_t* data);
     bool belongsToSameIteration(const TSPacket& p1, const TSPacket& p2);
@@ -179,6 +214,7 @@ private:
     bool tryFindValidIteration();
     void processBuffer();
     void processPSIPacket(const TSPacket& packet);
+    void processPCR(const TSPacket& packet);
 };
 
 } // namespace mpegts
