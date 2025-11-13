@@ -97,41 +97,45 @@ bool MPEGTSDemuxer::tryFindValidIteration() {
     // We need to find at least 3 valid packets to confirm synchronization
 
     const size_t min_buffer_for_sync = MPEGTS_PACKET_SIZE * 3;
-    if (raw_buffer_.size() < min_buffer_for_sync) {
+    const size_t buffer_size = raw_buffer_.size(); // Cache size to avoid repeated calls
+
+    if (buffer_size < min_buffer_for_sync) {
         return false; // Not enough data
     }
 
+    // Get direct pointer to buffer data for faster access
+    const uint8_t* buffer_data = raw_buffer_.data();
+
     // Scan for potential sync positions
-    for (size_t start_pos = 0;
-         start_pos + min_buffer_for_sync <= raw_buffer_.size();
-         ++start_pos) {
+    const size_t max_start_pos = buffer_size - min_buffer_for_sync;
+    for (size_t start_pos = 0; start_pos <= max_start_pos; ++start_pos) {
 
         // Check for sync byte at this position
-        if (raw_buffer_[start_pos] != MPEGTS_SYNC_BYTE) {
+        if (buffer_data[start_pos] != MPEGTS_SYNC_BYTE) {
             continue;
         }
 
         // Try to parse first packet
         TSPacket packet1;
-        if (!packet1.parse(&raw_buffer_[start_pos]) || !packet1.isValid()) {
+        if (!packet1.parse(&buffer_data[start_pos]) || !packet1.isValid()) {
             continue;
         }
 
         // Search for second valid packet (adaptive search)
         std::vector<TSPacket> candidates;
+        candidates.reserve(sync_validation_depth_); // Pre-allocate to avoid reallocation
         candidates.push_back(packet1);
 
         size_t search_pos = start_pos + 1;
-        size_t max_search = std::min(start_pos + MPEGTS_PACKET_SIZE * 10,
-                                     raw_buffer_.size());
+        const size_t max_search = std::min(start_pos + MPEGTS_PACKET_SIZE * 10, buffer_size);
 
-        while (candidates.size() < sync_validation_depth_ &&
+        while (candidates.size() < static_cast<size_t>(sync_validation_depth_) &&
                search_pos + MPEGTS_PACKET_SIZE <= max_search) {
 
-            if (raw_buffer_[search_pos] == MPEGTS_SYNC_BYTE) {
+            if (buffer_data[search_pos] == MPEGTS_SYNC_BYTE) {
                 TSPacket packet_candidate;
 
-                if (packet_candidate.parse(&raw_buffer_[search_pos]) &&
+                if (packet_candidate.parse(&buffer_data[search_pos]) &&
                     packet_candidate.isValid()) {
 
                     // Check if belongs to same iteration
@@ -152,11 +156,12 @@ bool MPEGTSDemuxer::tryFindValidIteration() {
         }
 
         // Check if we found 3 valid packets
-        if (candidates.size() >= sync_validation_depth_) {
+        const size_t candidates_count = candidates.size();
+        if (candidates_count >= static_cast<size_t>(sync_validation_depth_)) {
             // Verify they form a consistent sequence
             bool valid_sequence = true;
 
-            for (size_t i = 1; i < candidates.size(); ++i) {
+            for (size_t i = 1; i < candidates_count; ++i) {
                 if (!belongsToSameIteration(candidates[i-1], candidates[i])) {
                     valid_sequence = false;
                     break;

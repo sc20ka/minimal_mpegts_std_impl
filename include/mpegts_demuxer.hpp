@@ -9,7 +9,7 @@
 #include <vector>
 #include <memory>
 #include <optional>
-#include <map>
+#include <unordered_map>
 
 namespace mpegts {
 
@@ -190,15 +190,15 @@ private:
     std::set<uint16_t>      known_program_pids_;
 
     // Current iterations being built per PID
-    std::map<uint16_t, uint32_t>        current_iteration_ids_;
-    std::map<uint16_t, IterationData>   current_iterations_;
-    std::map<uint16_t, uint8_t>         last_cc_;
+    std::unordered_map<uint16_t, uint32_t>        current_iteration_ids_;
+    std::unordered_map<uint16_t, IterationData>   current_iterations_;
+    std::unordered_map<uint16_t, uint8_t>         last_cc_;
 
     // PSI (Program Specific Information) support
-    PSIAccumulator                      pat_accumulator_;
-    std::map<uint16_t, PSIAccumulator>  pmt_accumulators_;
-    std::optional<PAT>                  parsed_pat_;
-    std::map<uint16_t, PMT>             parsed_pmts_;  // key: program_number
+    PSIAccumulator                                pat_accumulator_;
+    std::unordered_map<uint16_t, PSIAccumulator>  pmt_accumulators_;
+    std::optional<PAT>                            parsed_pat_;
+    std::unordered_map<uint16_t, PMT>             parsed_pmts_;  // key: program_number
 
     // PCR (Program Clock Reference) support
     PCRManager                          pcr_manager_;
