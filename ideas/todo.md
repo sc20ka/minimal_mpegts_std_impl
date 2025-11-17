@@ -1602,6 +1602,878 @@ struct PayloadSegment {
 
 ---
 
-**Версия документа:** 1.0  
-**Последнее обновление:** November 2025  
+**Версия документа:** 1.0
+**Последнее обновление:** November 2025
+
+---
+---
+
+# MPEG-TS MUXER - Техническая спецификация и план разработки
+
+**Версия:** 0.1 (Планирование)
+**Язык:** C++17
+**Стандарт:** ISO/IEC 13818-1 (MPEG-TS)
+**Статус:** В разработке
+
+---
+
+## Содержание (Muxer)
+
+1. [Обзор Muxer](#обзор-muxer)
+2. [Архитектура Muxer](#архитектура-muxer)
+3. [Компоненты системы](#компоненты-системы)
+4. [План разработки (16 недель)](#план-разработки)
+5. [Технические задачи](#технические-задачи)
+6. [Тестирование](#тестирование-muxer)
+7. [API примеры](#api-примеры-muxer)
+
+---
+
+## Обзор Muxer
+
+### Назначение
+
+MPEG-TS Muxer предназначен для:
+
+- **Мультиплексирования** нескольких элементарных потоков в единый транспортный поток
+- **Генерации PSI таблиц** (PAT/PMT) для структуры программ
+- **Инъекции PCR** для синхронизации времени
+- **Пакетизации PES** из сырых элементарных потоков
+- **Контроля битрейта** (режимы CBR/VBR)
+
+### Ключевые характеристики
+
+| Характеристика        | Значение                           |
+| --------------------- | ---------------------------------- |
+| Макс. битрейт         | 50 Mbps                            |
+| Потоков одновременно  | 8                                  |
+| PCR интервал          | 40ms (конфигурируемый)             |
+| PAT/PMT интервал      | 100ms (конфигурируемый)            |
+| Режимы                | CBR, VBR                           |
+| Задержка              | < 100ms                            |
+| Видеокодеки           | H.264, H.265                       |
+| Аудиокодеки           | AAC, MP3, AC-3                     |
+
+---
+
+## Архитектура Muxer
+
+### Высокоуровневая схема
+
+```
+Elementary Streams Input (H.264, AAC, etc.)
+                ↓
+         PESPacketizer
+    (PTS/DTS generation)
+                ↓
+         TSPacketBuilder
+    (188-byte packets)
+                ↓
+         Multiplexer Core
+    (Scheduling, PSI, PCR)
+                ↓
+         BitrateController
+        (CBR/VBR, NULL)
+                ↓
+         Output Buffer
+                ↓
+    MPEG-TS Stream Output
+```
+
+---
+
+## Компоненты системы
+
+### 1. TSPacketBuilder
+
+**Файл:** `include/mpegts_packet_builder.hpp`
+
+**Задача:** Построение 188-байтовых TS пакетов из payload данных
+
+#### Интерфейс:
+
+```cpp
+class TSPacketBuilder {
+public:
+    TSPacketBuilder(uint16_t pid);
+
+    // Построить пакеты из payload
+    std::vector<TSPacket> build(
+        const uint8_t* payload, size_t length,
+        bool pusi, bool has_pcr = false,
+        uint64_t pcr_value = 0
+    );
+
+    // Создать NULL пакет
+    static TSPacket createNullPacket();
+
+private:
+    uint16_t pid_;
+    uint8_t continuity_counter_;
+
+    void insertAdaptationField(TSPacket& packet,
+                               const AdaptationField& adapt);
+};
+```
+
+#### Задачи разработки:
+
+- [ ] Создать класс TSPacketBuilder
+- [ ] Реализовать управление continuity counter
+- [ ] Реализовать вставку adaptation field
+- [ ] Реализовать stuffing bytes
+- [ ] Реализовать NULL пакеты
+- [ ] Unit тесты (25 тестов)
+
+**Приоритет:** Высокий
+**Неделя:** 2
+**Зависимости:** mpegts_packet.hpp (существует)
+
+---
+
+### 2. PESPacketizer
+
+**Файл:** `include/mpegts_pes_packetizer.hpp`
+
+**Задача:** Преобразование элементарных потоков в PES пакеты
+
+#### Интерфейс:
+
+```cpp
+class PESPacketizer {
+public:
+    PESPacketizer(uint8_t stream_id, StreamType type);
+
+    // Создать PES пакет из ES данных
+    std::vector<uint8_t> packetize(
+        const uint8_t* data, size_t length,
+        uint64_t pts,
+        uint64_t dts = NO_DTS
+    );
+
+    // Конфигурация
+    void setStreamID(uint8_t stream_id);
+    void enableDataAlignment(bool enable);
+
+private:
+    uint8_t stream_id_;
+    StreamType type_;
+
+    // Кодирование PTS (33-bit)
+    void encodePTS(uint8_t* buffer, uint64_t pts);
+    void encodeDTS(uint8_t* buffer, uint64_t dts);
+};
+```
+
+#### Задачи разработки:
+
+- [ ] Создать класс PESPacketizer
+- [ ] Реализовать PES header generation
+- [ ] Реализовать PTS encoding (33-bit)
+- [ ] Реализовать DTS encoding
+- [ ] Реализовать stream ID по типу потока
+- [ ] Unit тесты (20 тестов)
+
+**Приоритет:** Высокий
+**Неделя:** 5
+**Зависимости:** mpegts_pes.hpp (существует)
+
+---
+
+### 3. PSIGenerator
+
+**Файл:** `include/mpegts_psi_generator.hpp`
+
+**Задача:** Генерация PAT и PMT таблиц
+
+#### Интерфейс:
+
+```cpp
+class PSIGenerator {
+public:
+    // PAT генерация
+    std::vector<uint8_t> generatePAT(
+        uint16_t transport_stream_id,
+        const std::map<uint16_t, uint16_t>& programs
+    );
+
+    // PMT генерация
+    std::vector<uint8_t> generatePMT(
+        uint16_t program_number,
+        uint16_t pcr_pid,
+        const std::vector<PMTEntry>& streams
+    );
+
+    // Section обёртка
+    std::vector<uint8_t> wrapInSection(
+        uint8_t table_id,
+        const uint8_t* data, size_t length,
+        uint16_t table_id_extension
+    );
+
+private:
+    uint32_t calculateCRC32(const uint8_t* data, size_t length);
+    uint8_t version_number_;
+};
+```
+
+#### Задачи разработки:
+
+- [ ] Создать класс PSIGenerator
+- [ ] Реализовать PAT generation
+- [ ] Реализовать PMT generation
+- [ ] Реализовать CRC-32 (использовать из mpegts_psi.hpp)
+- [ ] Реализовать section wrapping
+- [ ] Реализовать version numbering
+- [ ] Unit тесты (30 тестов)
+
+**Приоритет:** Высокий
+**Неделя:** 3
+**Зависимости:** mpegts_psi.hpp (CRC-32 существует)
+
+---
+
+### 4. PCRInjector
+
+**Файл:** `include/mpegts_pcr_injector.hpp`
+
+**Задача:** Управление инъекцией Program Clock Reference
+
+#### Интерфейс:
+
+```cpp
+class PCRInjector {
+public:
+    PCRInjector(uint16_t pcr_pid);
+
+    // Проверка необходимости инъекции
+    bool shouldInjectPCR(uint64_t current_time_us);
+
+    // Генерация PCR значения
+    uint64_t getCurrentPCR();
+
+    // Создание adaptation field с PCR
+    AdaptationField createPCRAdaptation(uint64_t pcr_value);
+
+    // Конфигурация
+    void setPCRInterval(uint32_t interval_ms);
+    void setBaseClock(uint64_t base_time_us);
+
+private:
+    uint16_t pcr_pid_;
+    uint32_t pcr_interval_us_;
+    uint64_t last_pcr_time_;
+    uint64_t base_time_;
+
+    // PCR = PCR_base * 300 + PCR_ext
+    // PCR_base: 33 bits @ 90 kHz
+    // PCR_ext: 9 bits @ 27 MHz
+};
+```
+
+#### Задачи разработки:
+
+- [ ] Создать класс PCRInjector
+- [ ] Реализовать PCR calculation (27MHz base)
+- [ ] Реализовать timing control
+- [ ] Реализовать adaptation field с PCR
+- [ ] Интегрировать с TSPacketBuilder
+- [ ] Unit тесты (15 тестов)
+
+**Приоритет:** Средний
+**Неделя:** 6
+**Зависимости:** mpegts_pcr.hpp (существует)
+
+---
+
+### 5. StreamScheduler
+
+**Файл:** `include/mpegts_stream_scheduler.hpp`
+
+**Задача:** Планирование обслуживания множественных потоков
+
+#### Интерфейс:
+
+```cpp
+class StreamScheduler {
+public:
+    enum Priority {
+        PRIORITY_PSI,      // Самый высокий
+        PRIORITY_PCR,      // Высокий
+        PRIORITY_VIDEO,    // Средний-высокий
+        PRIORITY_AUDIO,    // Средний
+        PRIORITY_DATA      // Низкий
+    };
+
+    // Добавить поток в планировщик
+    void addStream(uint16_t pid, Priority priority,
+                   uint32_t bitrate);
+
+    // Получить следующий PID для обслуживания
+    uint16_t getNextPID();
+
+    // Обновить уровень буфера
+    void updateBufferLevel(uint16_t pid, size_t bytes_available);
+
+    // Управление битрейтом
+    void setBitrate(uint32_t total_bitrate_bps);
+    void setStreamBitrate(uint16_t pid, uint32_t bitrate_bps);
+
+private:
+    struct StreamInfo {
+        uint16_t pid;
+        Priority priority;
+        uint32_t bitrate;
+        size_t buffer_level;
+        uint64_t last_service_time;
+    };
+
+    std::map<uint16_t, StreamInfo> streams_;
+    uint32_t total_bitrate_;
+
+    uint16_t selectByPriority();
+    uint16_t selectByBufferLevel();
+};
+```
+
+#### Задачи разработки:
+
+- [ ] Создать класс StreamScheduler
+- [ ] Реализовать priority-based scheduling
+- [ ] Реализовать отслеживание buffer level
+- [ ] Реализовать round-robin с приоритетами
+- [ ] Реализовать обработку PSI/PCR приоритета
+- [ ] Unit тесты (25 тестов)
+
+**Приоритет:** Средний
+**Неделя:** 7
+**Зависимости:** Нет
+
+---
+
+### 6. BitrateController
+
+**Файл:** `include/mpegts_bitrate_controller.hpp`
+
+**Задача:** Контроль битрейта и вставка NULL пакетов
+
+#### Интерфейс:
+
+```cpp
+class BitrateController {
+public:
+    enum Mode {
+        CBR,  // Constant Bitrate
+        VBR   // Variable Bitrate
+    };
+
+    BitrateController(Mode mode, uint32_t bitrate_bps);
+
+    // Проверка готовности вывода
+    bool canOutputPacket(uint64_t current_time_us);
+
+    // Расчёт пакетов для периода времени
+    size_t getPacketsForDuration(uint32_t duration_us);
+
+    // Вставка NULL пакетов если нужно
+    void padToTime(std::vector<TSPacket>& output,
+                   uint64_t target_time_us);
+
+private:
+    Mode mode_;
+    uint32_t bitrate_bps_;
+    uint64_t packet_interval_us_;
+    uint64_t last_output_time_;
+
+    // Для CBR: интервал = (188 * 8 * 1000000) / bitrate_bps
+    // Для VBR: гибкий интервал
+};
+```
+
+#### Задачи разработки:
+
+- [ ] Создать класс BitrateController
+- [ ] Реализовать CBR mode с NULL padding
+- [ ] Реализовать VBR mode
+- [ ] Реализовать packet timing calculation
+- [ ] Реализовать NULL packet insertion
+- [ ] Unit тесты (20 тестов)
+
+**Приоритет:** Средний
+**Неделя:** 9
+**Зависимости:** TSPacketBuilder
+
+---
+
+### 7. MPEGTSMuxer (Main Class)
+
+**Файл:** `include/mpegts_muxer.hpp`
+
+**Задача:** Главный координатор всех операций мультиплексирования
+
+#### Интерфейс:
+
+```cpp
+class MPEGTSMuxer {
+public:
+    MPEGTSMuxer(const MuxerConfig& config);
+    ~MPEGTSMuxer();
+
+    // ===== Управление потоками =====
+    uint16_t addStream(const StreamConfig& config);
+    void removeStream(uint16_t pid);
+
+    // ===== Ввод данных =====
+    void feedElementaryData(uint16_t pid,
+                           const uint8_t* data, size_t length,
+                           uint64_t pts, uint64_t dts = NO_DTS);
+
+    // ===== Контроль вывода =====
+    std::vector<uint8_t> getOutputPackets(size_t max_packets = 0);
+    void setOutputCallback(OutputCallback callback);
+
+    // ===== Конфигурация =====
+    void setBitrate(uint32_t bitrate_bps);
+    void setMode(MuxMode mode);
+    void setPCRPID(uint16_t pid);
+    void setPCRInterval(uint32_t interval_ms);
+
+    // ===== PSI управление =====
+    void setProgramNumber(uint16_t program_num);
+    void setTransportStreamID(uint16_t tsid);
+    void setPATInterval(uint32_t interval_ms);
+    void setPMTInterval(uint32_t interval_ms);
+
+private:
+    MuxerConfig config_;
+
+    // Компоненты
+    std::unique_ptr<StreamScheduler> scheduler_;
+    std::unique_ptr<PSIGenerator> psi_generator_;
+    std::unique_ptr<PCRInjector> pcr_injector_;
+    std::unique_ptr<BitrateController> bitrate_controller_;
+
+    // Потоки
+    struct StreamContext {
+        uint16_t pid;
+        StreamConfig config;
+        std::unique_ptr<PESPacketizer> pes_packetizer;
+        std::unique_ptr<TSPacketBuilder> ts_builder;
+        std::queue<TSPacket> packet_buffer;
+    };
+
+    std::map<uint16_t, StreamContext> streams_;
+
+    // Вывод
+    std::vector<TSPacket> output_buffer_;
+
+    // Методы
+    void processPSI();
+    void processPCR();
+    void processStreams();
+    void outputPackets();
+};
+```
+
+#### Задачи разработки:
+
+- [ ] Создать класс MPEGTSMuxer
+- [ ] Реализовать управление потоками
+- [ ] Реализовать feedElementaryData()
+- [ ] Реализовать getOutputPackets()
+- [ ] Реализовать PSI периодичность
+- [ ] Реализовать PCR инъекцию
+- [ ] Реализовать scheduling loop
+- [ ] Integration тесты (30 тестов)
+
+**Приоритет:** Высокий
+**Неделя:** 4, 8, 11
+**Зависимости:** Все компоненты
+
+---
+
+## План разработки
+
+### Фаза 1: Foundation (Недели 1-4)
+
+#### Неделя 1: Инфраструктура
+- [ ] Создать `mpegts_muxer_types.hpp`
+  - StreamConfig
+  - MuxerConfig
+  - MuxMode enum
+  - OutputCallback type
+- [ ] Создать `mpegts_muxer.hpp` skeleton
+- [ ] Настроить CMake интеграцию
+- [ ] Создать тестовый фреймворк
+
+**Deliverables:**
+- Компилируемый muxer skeleton
+- Базовые типы определены
+- Тестовая инфраструктура готова
+
+---
+
+#### Неделя 2: TSPacketBuilder
+- [ ] Реализовать TSPacketBuilder класс
+- [ ] Реализовать базовую сборку 188-byte пакетов
+- [ ] Реализовать управление continuity counter
+- [ ] Реализовать вставку adaptation field
+- [ ] Реализовать обработку stuffing bytes
+- [ ] Написать 25+ unit тестов
+
+**Test Coverage:**
+- Структура пакета
+- Continuity counter increment
+- Adaptation field с PCR
+- PUSI flag handling
+- Максимальный размер payload
+
+---
+
+#### Неделя 3: PSIGenerator
+- [ ] Реализовать PSIGenerator класс
+- [ ] Реализовать PAT generation
+- [ ] Реализовать PMT generation
+- [ ] Реализовать CRC-32 (использовать из demuxer)
+- [ ] Реализовать section wrapping
+- [ ] Реализовать version numbering
+- [ ] Написать 30+ unit тестов
+
+**Test Coverage:**
+- PAT структура и CRC
+- PMT структура и CRC
+- Множественные потоки в PMT
+- Version number management
+- Section length validation
+
+---
+
+#### Неделя 4: Базовое управление потоками
+- [ ] Реализовать addStream() метод
+- [ ] Создать систему регистрации потоков
+- [ ] Реализовать базовое управление PID
+- [ ] Реализовать хранение метаданных потока
+- [ ] Создать простое управление буферами
+- [ ] Написать integration тесты
+
+**Test Coverage:**
+- Add/remove потоки
+- Уникальность PID
+- Валидация типа потока
+- Базовый data flow
+
+---
+
+### Фаза 2: PES и Multi-Stream (Недели 5-8)
+
+#### Неделя 5: PESPacketizer
+- [ ] Реализовать PESPacketizer класс
+- [ ] Реализовать PES header generation
+- [ ] Реализовать PTS encoding (33-bit)
+- [ ] Реализовать DTS encoding
+- [ ] Реализовать stream IDs по типу
+- [ ] Реализовать управление размером пакета
+- [ ] Написать 20+ unit тестов
+
+---
+
+#### Неделя 6: PCR Injection
+- [ ] Реализовать PCRInjector класс
+- [ ] Реализовать PCR calculation (27MHz base)
+- [ ] Реализовать timing control (40ms default)
+- [ ] Реализовать adaptation field с PCR
+- [ ] Интегрировать с packet builder
+- [ ] Написать timing accuracy тесты
+
+---
+
+#### Неделя 7: StreamScheduler
+- [ ] Реализовать StreamScheduler класс
+- [ ] Реализовать priority-based scheduling
+- [ ] Реализовать отслеживание buffer level
+- [ ] Реализовать round-robin с приоритетами
+- [ ] Реализовать PSI/PCR priority handling
+- [ ] Написать scheduling тесты
+
+---
+
+#### Неделя 8: Integration Testing
+- [ ] Создать end-to-end тестовые сценарии
+- [ ] Тестировать 2-stream muxing (video + audio)
+- [ ] Тестировать 4-stream muxing
+- [ ] Валидировать вывод с demuxer
+- [ ] Тестировать PSI периодичность
+- [ ] Тестировать PCR точность
+- [ ] Performance profiling
+
+---
+
+### Фаза 3: Bitrate Control (Недели 9-12)
+
+#### Неделя 9: BitrateController
+- [ ] Реализовать BitrateController класс
+- [ ] Реализовать CBR mode с NULL padding
+- [ ] Реализовать VBR mode
+- [ ] Реализовать packet timing calculation
+- [ ] Реализовать NULL packet insertion
+- [ ] Написать bitrate accuracy тесты
+
+---
+
+#### Неделя 10: Stream Synchronization
+- [ ] Реализовать PTS alignment проверку
+- [ ] Реализовать buffer management для sync
+- [ ] Реализовать обработку variable frame rates
+- [ ] Реализовать latency compensation
+- [ ] Написать A/V sync тесты
+
+---
+
+#### Неделя 11: Error Handling
+- [ ] Реализовать валидацию входных данных
+- [ ] Реализовать обработку buffer overflow
+- [ ] Реализовать underflow recovery
+- [ ] Реализовать error callbacks
+- [ ] Реализовать logging систему
+- [ ] Написать error scenario тесты
+
+---
+
+#### Неделя 12: Performance Optimization
+- [ ] Профилировать критические пути
+- [ ] Оптимизировать packet assembly
+- [ ] Уменьшить memory allocations
+- [ ] Оптимизировать buffer management
+- [ ] Реализовать memory pooling
+- [ ] Бенчмарки против целей
+
+---
+
+### Фаза 4: Polish (Недели 13-16)
+
+#### Неделя 13: Дополнительные кодеки
+- [ ] Добавить H.265/HEVC поддержку
+- [ ] Добавить MP3 audio поддержку
+- [ ] Добавить AC-3 audio поддержку
+- [ ] Добавить private data streams
+- [ ] Обновить PSI generator
+- [ ] Написать codec-specific тесты
+
+---
+
+#### Неделя 14: Examples и Tools
+- [ ] Создать basic muxing example
+- [ ] Создать multi-stream example
+- [ ] Создать file muxer tool
+- [ ] Создать streaming tool
+- [ ] Добавить example media files
+- [ ] Написать example документацию
+
+---
+
+#### Неделя 15: Comprehensive Testing
+- [ ] Compliance testing (ISO/IEC 13818-1)
+- [ ] Cross-validation с FFmpeg
+- [ ] Stress testing (24+ hour runs)
+- [ ] Edge case testing
+- [ ] Memory leak detection
+- [ ] Thread safety validation
+
+---
+
+#### Неделя 16: Documentation
+- [ ] Завершить API документацию
+- [ ] Написать user guide
+- [ ] Создать architecture diagrams
+- [ ] Написать performance guide
+- [ ] Обновить main README
+- [ ] Создать CHANGELOG
+- [ ] Подготовить release notes
+
+---
+
+## Технические задачи
+
+### Высокий приоритет
+
+1. **TSPacketBuilder** (Неделя 2)
+   - Создание валидных 188-byte пакетов
+   - Управление continuity counter
+   - Adaptation field
+
+2. **PSIGenerator** (Неделя 3)
+   - PAT/PMT generation
+   - CRC-32 calculation
+   - Section formatting
+
+3. **PESPacketizer** (Неделя 5)
+   - PTS/DTS encoding
+   - Stream ID handling
+   - Header generation
+
+4. **MPEGTSMuxer Core** (Недели 4, 8, 11)
+   - Stream management
+   - Output control
+   - Main muxing loop
+
+### Средний приоритет
+
+5. **PCRInjector** (Неделя 6)
+   - PCR calculation
+   - Timing accuracy
+   - 40ms interval
+
+6. **StreamScheduler** (Неделя 7)
+   - Priority scheduling
+   - Buffer management
+   - Fair interleaving
+
+7. **BitrateController** (Неделя 9)
+   - CBR/VBR modes
+   - NULL padding
+   - Timing control
+
+### Низкий приоритет
+
+8. **Performance Optimization** (Неделя 12)
+9. **Additional Codecs** (Неделя 13)
+10. **Tools и Examples** (Неделя 14)
+
+---
+
+## Тестирование Muxer
+
+### Unit Tests (Целевое: 150+ тестов)
+
+- **TSPacketBuilder**: 25 тестов
+- **PESPacketizer**: 20 тестов
+- **PSIGenerator**: 30 тестов
+- **PCRInjector**: 15 тестов
+- **StreamScheduler**: 25 тестов
+- **BitrateController**: 20 тестов
+- **MPEGTSMuxer**: 15 тестов
+
+### Integration Tests (Целевое: 50+ тестов)
+
+- Single stream scenarios: 10 тестов
+- Multi-stream scenarios: 15 тестов
+- PSI/PCR timing: 10 тестов
+- Bitrate conformance: 10 тестов
+- Error scenarios: 5 тестов
+
+### Compliance Tests (Целевое: 20+ тестов)
+
+- ISO/IEC 13818-1 validation
+- PAT/PMT структура
+- PCR точность
+- PTS/DTS monotonicity
+- Bitrate conformance
+
+---
+
+## API Примеры Muxer
+
+### Пример 1: Простой muxing
+
+```cpp
+#include "mpegts_muxer.hpp"
+
+int main() {
+    using namespace mpegts;
+
+    // Конфигурация muxer
+    MuxerConfig config;
+    config.bitrate = 5'000'000;  // 5 Mbps
+    config.mode = MuxMode::CBR;
+    config.program_number = 1;
+    config.transport_stream_id = 1;
+
+    MPEGTSMuxer muxer(config);
+
+    // Добавить video поток
+    StreamConfig video;
+    video.type = StreamType::VIDEO_H264;
+    video.pid = 0x100;
+    video.bitrate = 4'000'000;
+    video.pcr_enabled = true;
+    uint16_t video_pid = muxer.addStream(video);
+
+    // Добавить audio поток
+    StreamConfig audio;
+    audio.type = StreamType::AUDIO_AAC;
+    audio.pid = 0x101;
+    audio.bitrate = 192'000;
+    uint16_t audio_pid = muxer.addStream(audio);
+
+    // Установить PCR поток
+    muxer.setPCRPID(video_pid);
+
+    // Feed данные
+    uint8_t video_frame[100000];
+    uint64_t pts = 0;
+    muxer.feedElementaryData(video_pid, video_frame,
+                            sizeof(video_frame), pts, pts);
+
+    // Получить вывод
+    auto output = muxer.getOutputPackets();
+    write_to_file(output.data(), output.size());
+
+    return 0;
+}
+```
+
+### Пример 2: Live streaming
+
+```cpp
+// Live streaming с callback
+void outputCallback(const uint8_t* data, size_t length) {
+    // Отправить в network
+    send_to_network(data, length);
+}
+
+MPEGTSMuxer muxer(config);
+muxer.setOutputCallback(outputCallback);
+
+// Непрерывная подача данных
+while (true) {
+    auto frame = capture_video_frame();
+    muxer.feedElementaryData(video_pid, frame.data,
+                            frame.size, frame.pts, frame.dts);
+
+    auto audio = capture_audio_frame();
+    muxer.feedElementaryData(audio_pid, audio.data,
+                            audio.size, audio.pts);
+}
+```
+
+---
+
+## Milestone Tracking
+
+### M1: Basic Muxing (Конец недели 4)
+- [ ] Single stream muxing работает
+- [ ] Валидные TS пакеты генерируются
+- [ ] Базовые PSI таблицы
+
+### M2: Multi-Stream Support (Конец недели 8)
+- [ ] Multiple streams muxing
+- [ ] PCR injection работает
+- [ ] Stream scheduling функционален
+
+### M3: Production Ready (Конец недели 12)
+- [ ] CBR/VBR поддержка
+- [ ] Error handling завершён
+- [ ] Performance targets достигнуты
+
+### M4: Release (Конец недели 16)
+- [ ] Полная документация
+- [ ] Comprehensive testing
+- [ ] Examples и tools
+- [ ] Version 1.0 release
+
+---
+
+**Конец документа Muxer**
+**Версия:** 0.1
+**Дата:** November 2025
 **Статус:** Готово к реализации
