@@ -36,12 +36,17 @@
 - [ ] Add continuity counter management
 - [ ] Implement adaptation field insertion
 - [ ] Add stuffing byte handling
+- [ ] **Add private data support in adaptation field**
+- [ ] **Implement transport_private_data_flag handling**
+- [ ] **Validate max private data size (182 bytes)**
 - [ ] Write unit tests for packet builder
 
 **Test Coverage:**
 - Packet structure validation
 - Continuity counter increment
 - Adaptation field with PCR
+- **Adaptation field with private data**
+- **Private data + PCR combined**
 - PUSI flag handling
 - Maximum payload size
 
@@ -87,6 +92,9 @@
 - [ ] Implement basic PID management
 - [ ] Add stream metadata storage
 - [ ] Create simple buffer management
+- [ ] **Create `PrivateDataManager` class skeleton**
+- [ ] **Implement basic private data queue management**
+- [ ] **Add private data configuration to StreamConfig**
 - [ ] Write integration tests
 
 **Test Coverage:**
@@ -94,6 +102,8 @@
 - PID uniqueness validation
 - Stream type validation
 - Basic data flow
+- **Simple private data insertion**
+- **Private data queue management**
 
 **Deliverables:**
 - Single stream muxing works
@@ -229,26 +239,38 @@
 
 ---
 
-### Week 10: Stream Synchronization
-**Goal:** Ensure proper A/V sync
+### Week 10: Stream Synchronization & Advanced Private Data
+**Goal:** Ensure proper A/V sync and complete private data support
 
 #### Tasks:
 - [ ] Implement PTS alignment checking
 - [ ] Add buffer management for sync
 - [ ] Handle variable frame rates
 - [ ] Add latency compensation
+- [ ] **Complete PrivateDataManager implementation**
+- [ ] **Add PTS-synchronized private data insertion**
+- [ ] **Implement insertion strategies (WITH_PCR, STANDALONE, WITH_PAYLOAD)**
+- [ ] **Add dedicated private data stream support (stream_type = 0x06)**
+- [ ] **Implement private data overflow handling**
 - [ ] Write A/V sync tests
+- [ ] **Write comprehensive private data tests**
 
 **Test Coverage:**
 - Audio-video sync accuracy
 - Variable bitrate handling
 - Buffering strategies
 - Drift correction
+- **Private data synchronization with PTS**
+- **Private data insertion modes**
+- **Dedicated private stream muxing**
+- **Cross-validation with demuxer private data extraction**
 
 **Deliverables:**
 - A/V sync within ±40ms
 - Stable long-duration muxing
-- 8+ unit tests passing
+- **Full private data support**
+- **Demuxer can extract all private data correctly**
+- 15+ unit tests passing (including 7+ private data tests)
 
 ---
 
@@ -396,20 +418,26 @@
 
 ## Testing Strategy
 
-### Unit Tests (Target: 150+ tests)
-- **TSPacketBuilder**: 25 tests
+### Unit Tests (Target: 165+ tests)
+- **TSPacketBuilder**: 30 tests (includes 5 private data tests)
 - **PESPacketizer**: 20 tests
 - **PSIGenerator**: 30 tests
 - **PCRInjector**: 15 tests
 - **StreamScheduler**: 25 tests
 - **BitrateController**: 20 tests
+- **PrivateDataManager**: 10 tests
 - **MPEGTSMuxer**: 15 tests
 
-### Integration Tests (Target: 50+ tests)
+### Integration Tests (Target: 60+ tests)
 - Single stream scenarios: 10 tests
 - Multi-stream scenarios: 15 tests
 - PSI/PCR timing: 10 tests
 - Bitrate conformance: 10 tests
+- **Private data scenarios**: 10 tests
+  - Private data in adaptation field
+  - PTS-synchronized private data
+  - Dedicated private stream
+  - Cross-validation with demuxer
 - Error scenarios: 5 tests
 
 ### Compliance Tests (Target: 20+ tests)

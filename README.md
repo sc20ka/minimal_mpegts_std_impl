@@ -21,6 +21,7 @@ This project provides a clean, profile-agnostic implementation of MPEG-TS tools 
 - **PCR injection** for timing synchronization
 - **PES packetization** from raw elementary streams
 - **Bitrate control** (CBR/VBR modes)
+- **Private data support** - metadata and auxiliary information insertion
 
 ## ⚠️ Current Development Stage
 

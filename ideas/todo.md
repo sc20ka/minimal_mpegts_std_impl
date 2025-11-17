@@ -1721,9 +1721,11 @@ private:
 - [ ] Создать класс TSPacketBuilder
 - [ ] Реализовать управление continuity counter
 - [ ] Реализовать вставку adaptation field
+- [ ] **Реализовать поддержку private data в adaptation field**
+- [ ] **Реализовать transport_private_data_flag**
 - [ ] Реализовать stuffing bytes
 - [ ] Реализовать NULL пакеты
-- [ ] Unit тесты (25 тестов)
+- [ ] Unit тесты (30 тестов, включая 5 для private data)
 
 **Приоритет:** Высокий
 **Неделя:** 2
@@ -2005,7 +2007,72 @@ private:
 
 ---
 
-### 7. MPEGTSMuxer (Main Class)
+### 7. PrivateDataManager
+
+**Файл:** `include/mpegts_private_data_manager.hpp`
+
+**Задача:** Управление вставкой private data в adaptation fields
+
+#### Интерфейс:
+
+```cpp
+class PrivateDataManager {
+public:
+    PrivateDataManager();
+
+    // Добавить private data для вставки
+    void addPrivateData(uint16_t pid, const uint8_t* data,
+                       size_t length, uint64_t pts = 0);
+
+    // Проверка наличия private data для PID
+    bool hasPrivateData(uint16_t pid) const;
+
+    // Получить следующий private data для PID
+    std::vector<uint8_t> getPrivateData(uint16_t pid);
+
+    // Конфигурация стратегии вставки
+    enum InsertionMode {
+        INSERT_WITH_PCR,        // Вставлять с PCR пакетами
+        INSERT_STANDALONE,      // Создавать отдельные пакеты
+        INSERT_WITH_PAYLOAD     // Вставлять с payload пакетами
+    };
+
+    void setInsertionMode(uint16_t pid, InsertionMode mode);
+
+    // Максимальный размер private data на пакет
+    void setMaxSize(size_t max_bytes); // По умолчанию: 182 bytes
+
+private:
+    struct PrivateDataEntry {
+        std::vector<uint8_t> data;
+        uint64_t pts;
+        InsertionMode mode;
+    };
+
+    std::map<uint16_t, std::queue<PrivateDataEntry>> private_data_queues_;
+    InsertionMode default_mode_;
+    size_t max_private_data_size_;
+};
+```
+
+#### Задачи разработки:
+
+- [ ] Создать класс PrivateDataManager
+- [ ] Реализовать queue management для private data
+- [ ] Реализовать insertion modes (WITH_PCR, STANDALONE, WITH_PAYLOAD)
+- [ ] Реализовать PTS-синхронизацию
+- [ ] Реализовать overflow handling
+- [ ] Интегрировать с TSPacketBuilder
+- [ ] Интегрировать с MPEGTSMuxer
+- [ ] Unit тесты (10 тестов)
+
+**Приоритет:** Средний
+**Неделя:** 4 (skeleton), 10 (complete)
+**Зависимости:** TSPacketBuilder
+
+---
+
+### 8. MPEGTSMuxer (Main Class)
 
 **Файл:** `include/mpegts_muxer.hpp`
 
@@ -2044,6 +2111,17 @@ public:
     void setPATInterval(uint32_t interval_ms);
     void setPMTInterval(uint32_t interval_ms);
 
+    // ===== Private Data управление =====
+    void addPrivateData(uint16_t pid,
+                       const uint8_t* data, size_t length);
+    void addPrivateDataWithPTS(uint16_t pid,
+                              const uint8_t* data, size_t length,
+                              uint64_t pts);
+    void setPrivateDataMode(uint16_t pid,
+                           PrivateDataInsertionMode mode);
+    uint16_t addPrivateDataStream(uint16_t pid,
+                                  uint32_t bitrate = 64000);
+
 private:
     MuxerConfig config_;
 
@@ -2052,6 +2130,7 @@ private:
     std::unique_ptr<PSIGenerator> psi_generator_;
     std::unique_ptr<PCRInjector> pcr_injector_;
     std::unique_ptr<BitrateController> bitrate_controller_;
+    std::unique_ptr<PrivateDataManager> private_data_manager_;
 
     // Потоки
     struct StreamContext {

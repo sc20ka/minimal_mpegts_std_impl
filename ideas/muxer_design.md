@@ -341,9 +341,197 @@ private:
 
 ---
 
-## 4. Data Flow
+### 3.8 PrivateDataManager
 
-### 4.1 Input Processing
+**Responsibilities:**
+- Manage private data insertion in adaptation fields
+- Handle transport_private_data_flag
+- Support custom metadata and auxiliary data
+- Coordinate with TSPacketBuilder
+
+**Key Features:**
+```cpp
+class PrivateDataManager {
+public:
+    PrivateDataManager();
+
+    // Add private data to be inserted
+    void addPrivateData(uint16_t pid, const uint8_t* data,
+                       size_t length, uint64_t pts = 0);
+
+    // Check if private data available for PID
+    bool hasPrivateData(uint16_t pid) const;
+
+    // Get next private data for PID
+    std::vector<uint8_t> getPrivateData(uint16_t pid);
+
+    // Configure private data insertion strategy
+    enum InsertionMode {
+        INSERT_WITH_PCR,        // Insert with PCR packets
+        INSERT_STANDALONE,      // Create dedicated packets
+        INSERT_WITH_PAYLOAD     // Insert with payload packets
+    };
+
+    void setInsertionMode(uint16_t pid, InsertionMode mode);
+
+    // Maximum private data size per packet
+    void setMaxSize(size_t max_bytes); // Default: 182 bytes
+
+private:
+    struct PrivateDataEntry {
+        std::vector<uint8_t> data;
+        uint64_t pts;
+        InsertionMode mode;
+    };
+
+    std::map<uint16_t, std::queue<PrivateDataEntry>> private_data_queues_;
+    InsertionMode default_mode_;
+    size_t max_private_data_size_;
+};
+```
+
+---
+
+## 4. Private Data Support
+
+### 4.1 Overview
+
+Private data support allows embedding custom metadata and auxiliary information
+within the MPEG-TS stream through the adaptation field's
+`transport_private_data` mechanism.
+
+### 4.2 Use Cases
+
+**Typical Applications:**
+- **Timecode/SMPTE metadata** - Frame-accurate timestamps
+- **Closed captions/subtitles** - Text overlay data
+- **Analytics metadata** - Scene detection, object tracking
+- **Custom signaling** - Application-specific commands
+- **Encryption keys** - Conditional access metadata
+- **Audio metadata** - Dolby/DTS descriptors
+
+### 4.3 Private Data Insertion Methods
+
+#### Method 1: In Adaptation Field (Recommended)
+```
+TS Packet Header (4 bytes)
+    ↓
+Adaptation Field
+    adaptation_field_length
+    flags
+    [PCR if present]
+    [OPCR if present]
+    → transport_private_data_flag = 1
+    → transport_private_data_length
+    → private_data (up to 182 bytes)
+    ↓
+Payload (if present)
+```
+
+**Advantages:**
+- Standard-compliant
+- Co-located with payload
+- Efficient bandwidth usage
+
+#### Method 2: Dedicated Private Stream
+```
+Create separate PID for private data:
+- stream_type = 0x06 (PES_private_data)
+- Encapsulate in PES packets
+- Full control over data structure
+```
+
+**Advantages:**
+- Unlimited data size
+- Independent bitrate control
+- Easy filtering by receivers
+
+### 4.4 Integration with TSPacketBuilder
+
+```cpp
+// Example: Adding private data to packet
+TSPacketBuilder builder(pid);
+
+// Prepare private data
+uint8_t private_data[] = {0x01, 0x02, 0x03, 0x04};
+
+// Create adaptation field with private data
+AdaptationField adapt;
+adapt.transport_private_data_flag = true;
+adapt.private_data_length = sizeof(private_data);
+adapt.private_data = private_data;
+
+// Build packet with adaptation field
+auto packets = builder.build(payload, payload_len,
+                             true, false, 0, &adapt);
+```
+
+### 4.5 Private Data API in MPEGTSMuxer
+
+```cpp
+class MPEGTSMuxer {
+public:
+    // ... existing methods ...
+
+    // ===== Private Data Management =====
+
+    // Add private data for specific PID
+    void addPrivateData(uint16_t pid,
+                       const uint8_t* data, size_t length);
+
+    // Add timestamped private data
+    void addPrivateDataWithPTS(uint16_t pid,
+                              const uint8_t* data, size_t length,
+                              uint64_t pts);
+
+    // Set private data insertion mode
+    void setPrivateDataMode(uint16_t pid,
+                           PrivateDataInsertionMode mode);
+
+    // Create dedicated private data stream
+    uint16_t addPrivateDataStream(uint16_t pid,
+                                  uint32_t bitrate = 64000);
+
+private:
+    std::unique_ptr<PrivateDataManager> private_data_manager_;
+};
+```
+
+### 4.6 Private Data Timing
+
+**Synchronization with main stream:**
+- Private data can be associated with PTS timestamps
+- Muxer ensures private data appears close to associated video frame
+- Configurable insertion strategy (every packet, PCR packets only, etc.)
+
+**Buffer management:**
+- Private data queue per PID
+- FIFO ordering
+- Overflow handling (drop oldest or newest)
+
+### 4.7 Implementation Plan
+
+**Week 2 (TSPacketBuilder):**
+- [ ] Add adaptation field with private data support
+- [ ] Test private data insertion
+- [ ] Validate max size constraints (182 bytes)
+
+**Week 4 (Basic Stream Management):**
+- [ ] Add PrivateDataManager skeleton
+- [ ] Implement queue management
+- [ ] Test with simple private data
+
+**Week 10 (Advanced Features):**
+- [ ] Add PTS-synchronized private data
+- [ ] Implement insertion strategies
+- [ ] Add dedicated private stream support
+- [ ] Comprehensive testing with demuxer
+
+---
+
+## 5. Data Flow
+
+### 5.1 Input Processing
 ```
 Elementary Stream Data
          ↓
@@ -356,7 +544,7 @@ Elementary Stream Data
     TS Packets (in buffer)
 ```
 
-### 4.2 Multiplexing Loop
+### 5.2 Multiplexing Loop
 ```
 1. Check PCR injection needed → inject if necessary
 2. Check PSI table needed → generate PAT/PMT if necessary
@@ -370,9 +558,9 @@ Elementary Stream Data
 
 ---
 
-## 5. Configuration Structures
+## 6. Configuration Structures
 
-### 5.1 StreamConfig
+### 6.1 StreamConfig
 ```cpp
 struct StreamConfig {
     StreamType type;           // VIDEO_H264, AUDIO_AAC, etc.
@@ -380,6 +568,11 @@ struct StreamConfig {
     uint8_t stream_id;        // PES stream ID
     uint32_t bitrate;         // Stream bitrate (bps)
     bool pcr_enabled;         // Generate PCR for this stream
+
+    // Private data support
+    bool private_data_enabled;        // Enable private data insertion
+    PrivateDataInsertionMode mode;    // Insertion strategy
+    size_t max_private_data_size;     // Max bytes per packet (default: 182)
 
     // Video-specific
     uint16_t width;
@@ -392,7 +585,7 @@ struct StreamConfig {
 };
 ```
 
-### 5.2 MuxerConfig
+### 6.2 MuxerConfig
 ```cpp
 struct MuxerConfig {
     uint32_t bitrate;              // Total bitrate (bps)
@@ -408,7 +601,7 @@ struct MuxerConfig {
 
 ---
 
-## 6. Stream Types Support
+## 7. Stream Types Support
 
 ### Phase 1 (Core):
 - ✅ H.264 Video (stream_type = 0x1B)
@@ -427,7 +620,7 @@ struct MuxerConfig {
 
 ---
 
-## 7. Performance Targets
+## 8. Performance Targets
 
 | Metric | Target | Notes |
 |--------|--------|-------|
@@ -440,7 +633,7 @@ struct MuxerConfig {
 
 ---
 
-## 8. Error Handling
+## 9. Error Handling
 
 ### Input Validation:
 - Check PTS/DTS monotonicity
@@ -459,7 +652,7 @@ struct MuxerConfig {
 
 ---
 
-## 9. Testing Strategy
+## 10. Testing Strategy
 
 ### Unit Tests:
 - PESPacketizer: PTS/DTS encoding
@@ -481,7 +674,7 @@ struct MuxerConfig {
 
 ---
 
-## 10. API Usage Example
+## 11. API Usage Example
 
 ```cpp
 #include "mpegts_muxer.hpp"
@@ -532,7 +725,7 @@ int main() {
 
 ---
 
-## 11. Implementation Phases
+## 12. Implementation Phases
 
 ### Phase 1: Core Muxing (4-6 weeks)
 - TSPacketBuilder
@@ -560,7 +753,7 @@ int main() {
 
 ---
 
-## 12. Dependencies
+## 13. Dependencies
 
 ### Internal (from Demuxer):
 - `mpegts_types.hpp` - Reuse structures
@@ -574,7 +767,7 @@ int main() {
 
 ---
 
-## 13. Future Extensions
+## 14. Future Extensions
 
 ### Advanced Features:
 - Multi-program transport streams
