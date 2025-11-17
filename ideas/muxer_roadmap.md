@@ -1,59 +1,69 @@
 # MPEG-TS Muxer Development Roadmap
 
 ## Project Timeline: 12-16 weeks
+## Current Progress: Week 2 Complete (12.5%)
+
+**Last Updated:** November 17, 2025
 
 ---
 
 ## Phase 1: Foundation (Weeks 1-4)
 
-### Week 1: Core Infrastructure
+### ✅ Week 1: Core Infrastructure (COMPLETED)
 **Goal:** Set up basic muxer structure and types
 
 #### Tasks:
-- [ ] Create `mpegts_muxer.hpp` header file
-- [ ] Define `MPEGTSMuxer` class skeleton
-- [ ] Create muxer-specific types in `mpegts_muxer_types.hpp`:
-  - `StreamConfig`
-  - `MuxerConfig`
-  - `MuxMode` enum (CBR/VBR)
-  - `OutputCallback` type
-- [ ] Set up CMake build integration
-- [ ] Create test framework for muxer
+- [x] Create `mpegts_muxer.hpp` header file
+- [x] Define `MPEGTSMuxer` class skeleton
+- [x] Create muxer-specific types in `mpegts_muxer_types.hpp`:
+  - [x] `StreamConfig`
+  - [x] `MuxerConfig`
+  - [x] `MuxMode` enum (CBR/VBR)
+  - [x] `OutputCallback` type
+  - [x] `PrivateDataInsertionMode` enum
+- [x] Set up CMake build integration
+- [x] Create test framework for muxer
 
-**Deliverables:**
-- Compilable muxer skeleton
-- Basic types defined
-- Test infrastructure ready
+**Deliverables:** ✅ ALL COMPLETE
+- ✅ Compilable muxer skeleton (324 lines)
+- ✅ Basic types defined (210 lines)
+- ✅ Test infrastructure ready (12 tests passing)
+
+**Commit:** c27b5b8 "Add MPEG-TS Muxer Phase 1 Week 1: Core Infrastructure"
 
 ---
 
-### Week 2: TS Packet Builder
+### ✅ Week 2: TS Packet Builder (COMPLETED)
 **Goal:** Implement TS packet construction
 
 #### Tasks:
-- [ ] Create `TSPacketBuilder` class
-- [ ] Implement basic 188-byte packet assembly
-- [ ] Add continuity counter management
-- [ ] Implement adaptation field insertion
-- [ ] Add stuffing byte handling
-- [ ] **Add private data support in adaptation field**
-- [ ] **Implement transport_private_data_flag handling**
-- [ ] **Validate max private data size (182 bytes)**
-- [ ] Write unit tests for packet builder
+- [x] Create `TSPacketBuilder` class
+- [x] Implement basic 188-byte packet assembly
+- [x] Add continuity counter management
+- [x] Implement adaptation field insertion
+- [x] Add stuffing byte handling
+- [x] **Add private data support in adaptation field**
+- [x] **Implement transport_private_data_flag handling**
+- [x] **Validate max private data size (182 bytes)**
+- [x] Write unit tests for packet builder (27 tests)
 
-**Test Coverage:**
-- Packet structure validation
-- Continuity counter increment
-- Adaptation field with PCR
-- **Adaptation field with private data**
-- **Private data + PCR combined**
-- PUSI flag handling
-- Maximum payload size
+**Test Coverage:** ✅ ALL PASSING (27/27)
+- ✅ Packet structure validation
+- ✅ Continuity counter increment & wrap-around
+- ✅ Adaptation field with PCR
+- ✅ **Adaptation field with private data (5 dedicated tests)**
+- ✅ **Private data + PCR combined**
+- ✅ PUSI flag handling
+- ✅ Maximum payload size
+- ✅ Multi-packet splitting
+- ✅ NULL packet generation
 
-**Deliverables:**
-- Working `TSPacketBuilder`
-- 10+ unit tests passing
-- Documentation
+**Deliverables:** ✅ ALL COMPLETE
+- ✅ Working `TSPacketBuilder` (156 lines header, 302 lines impl)
+- ✅ 27 unit tests passing (target: 10+, achieved 270%)
+- ✅ Full documentation with examples
+
+**Commit:** 9df6ae7 "Add TSPacketBuilder - MPEG-TS Muxer Phase 1 Week 2"
 
 ---
 

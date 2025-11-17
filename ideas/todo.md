@@ -2173,39 +2173,52 @@ private:
 
 ## План разработки
 
+**Статус:** Week 2/16 завершено (12.5%)
+**Последнее обновление:** 17 ноября 2025
+
 ### Фаза 1: Foundation (Недели 1-4)
 
-#### Неделя 1: Инфраструктура
-- [ ] Создать `mpegts_muxer_types.hpp`
-  - StreamConfig
-  - MuxerConfig
-  - MuxMode enum
-  - OutputCallback type
-- [ ] Создать `mpegts_muxer.hpp` skeleton
-- [ ] Настроить CMake интеграцию
-- [ ] Создать тестовый фреймворк
+#### ✅ Неделя 1: Инфраструктура (ЗАВЕРШЕНО)
+- [x] Создать `mpegts_muxer_types.hpp` (210 строк)
+  - [x] StreamConfig
+  - [x] MuxerConfig
+  - [x] MuxMode enum
+  - [x] OutputCallback type
+  - [x] PrivateDataInsertionMode enum
+- [x] Создать `mpegts_muxer.hpp` skeleton (324 строки)
+- [x] Настроить CMake интеграцию
+- [x] Создать тестовый фреймворк (12 тестов)
 
-**Deliverables:**
-- Компилируемый muxer skeleton
-- Базовые типы определены
-- Тестовая инфраструктура готова
+**Deliverables:** ✅ ЗАВЕРШЕНО
+- ✅ Компилируемый muxer skeleton
+- ✅ Базовые типы определены
+- ✅ Тестовая инфраструктура готова
+
+**Commit:** c27b5b8
 
 ---
 
-#### Неделя 2: TSPacketBuilder
-- [ ] Реализовать TSPacketBuilder класс
-- [ ] Реализовать базовую сборку 188-byte пакетов
-- [ ] Реализовать управление continuity counter
-- [ ] Реализовать вставку adaptation field
-- [ ] Реализовать обработку stuffing bytes
-- [ ] Написать 25+ unit тестов
+#### ✅ Неделя 2: TSPacketBuilder (ЗАВЕРШЕНО)
+- [x] Реализовать TSPacketBuilder класс (156 строк header, 302 строки impl)
+- [x] Реализовать базовую сборку 188-byte пакетов
+- [x] Реализовать управление continuity counter (0-15 wrap)
+- [x] Реализовать вставку adaptation field (PCR, private data, flags)
+- [x] Реализовать обработку stuffing bytes
+- [x] Реализовать NULL пакеты (PID 0x1FFF)
+- [x] Реализовать multi-packet splitting
+- [x] Написать 27 unit тестов (цель: 25+, достигнуто 108%)
 
-**Test Coverage:**
-- Структура пакета
-- Continuity counter increment
-- Adaptation field с PCR
-- PUSI flag handling
-- Максимальный размер payload
+**Test Coverage:** ✅ 27/27 ПРОШЛО
+- ✅ Структура пакета
+- ✅ Continuity counter increment & wrap
+- ✅ Adaptation field с PCR
+- ✅ Adaptation field с private data (5 тестов)
+- ✅ PUSI flag handling
+- ✅ Максимальный размер payload
+- ✅ Multi-packet splitting
+- ✅ NULL пакеты
+
+**Commit:** 9df6ae7
 
 ---
 

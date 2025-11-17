@@ -57,15 +57,40 @@ The project has completed **Phase 2: Advanced Features** with comprehensive MPEG
 - ⏳ **Real-time statistics** - bitrate, jitter, continuity errors
 - ⏳ **Advanced error handling** - enhanced recovery strategies
 
-### 🚀 Planned (Phase 4 - MPEG-TS Muxer)
+### 🚀 In Progress (Phase 4 - MPEG-TS Muxer)
 
 **Target: 16-week development cycle**
+**Current Progress: Week 2/16 (12.5%)**
+**Last Updated:** November 17, 2025
 
-#### Phase 4.1: Foundation (Weeks 1-4)
-- ⏳ **TS Packet Builder** - construct valid 188-byte packets
+#### Phase 4.1: Foundation (Weeks 1-4) - IN PROGRESS
+
+##### ✅ Week 1: Core Infrastructure (COMPLETED)
+- ✅ **Core infrastructure** - muxer types and skeleton
+  - `mpegts_muxer_types.hpp` (210 lines): StreamConfig, MuxerConfig, enums
+  - `mpegts_muxer.hpp` (324 lines): MPEGTSMuxer class skeleton with full API
+  - 12 unit tests passing
+  - **Commit:** c27b5b8
+
+##### ✅ Week 2: TS Packet Builder (COMPLETED)
+- ✅ **TS Packet Builder** - construct valid 188-byte packets
+  - `mpegts_ts_packet_builder.hpp/cpp` (458 lines total)
+  - Continuity counter management (0-15 auto-increment with wrap)
+  - Adaptation field with PCR, private data, flags
+  - Multi-packet splitting, stuffing bytes, NULL packets
+  - **27/27 unit tests passing** (target: 25+, achieved 108%)
+  - **Commit:** 9df6ae7
+
+##### ⏳ Week 3: PSI Generator (NEXT)
 - ⏳ **PSI Generator** - create PAT/PMT tables with CRC-32
+  - PAT/PMT generation
+  - Section wrapping, version numbering
+  - Target: 30+ unit tests
+
+##### ⏳ Week 4: Basic Stream Management
 - ⏳ **Basic stream management** - single stream muxing
-- ⏳ **Core infrastructure** - muxer types and skeleton
+  - Stream registration, PID management
+  - Integration tests
 
 #### Phase 4.2: Multi-Stream & PES (Weeks 5-8)
 - ⏳ **PES Packetizer** - elementary stream → PES packets
@@ -88,6 +113,7 @@ The project has completed **Phase 2: Advanced Features** with comprehensive MPEG
 **See detailed plans in:**
 - `ideas/muxer_design.md` - Architecture and design
 - `ideas/muxer_roadmap.md` - Week-by-week development plan
+- `ideas/todo.md` - Technical specifications and tasks
 
 ## 🏗️ Architecture
 
