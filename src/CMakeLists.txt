@@ -10,6 +10,7 @@ set(MPEGTS_SOURCES
     mpegts_pes.cpp
     # Muxer sources
     mpegts_ts_packet_builder.cpp
+    mpegts_psi_generator.cpp
 )
 
 set(MPEGTS_HEADERS
@@ -25,6 +26,7 @@ set(MPEGTS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/mpegts_muxer.hpp
     ${PROJECT_SOURCE_DIR}/include/mpegts_muxer_types.hpp
     ${PROJECT_SOURCE_DIR}/include/mpegts_ts_packet_builder.hpp
+    ${PROJECT_SOURCE_DIR}/include/mpegts_psi_generator.hpp
 )
 
 # Create static library

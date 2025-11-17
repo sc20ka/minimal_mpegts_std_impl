@@ -10,11 +10,11 @@ using namespace mpegts;
 
 TEST(muxer_types_stream_type) {
     // Test StreamType enum values
-    TEST_ASSERT_EQ(static_cast<uint8_t>(StreamType::VIDEO_H264), 0x1B,
+    TEST_ASSERT_EQ(static_cast<uint8_t>(StreamType::H264_VIDEO), 0x1B,
                    "H.264 stream type should be 0x1B");
-    TEST_ASSERT_EQ(static_cast<uint8_t>(StreamType::VIDEO_H265), 0x24,
+    TEST_ASSERT_EQ(static_cast<uint8_t>(StreamType::H265_VIDEO), 0x24,
                    "H.265 stream type should be 0x24");
-    TEST_ASSERT_EQ(static_cast<uint8_t>(StreamType::AUDIO_AAC), 0x0F,
+    TEST_ASSERT_EQ(static_cast<uint8_t>(StreamType::AAC_AUDIO), 0x0F,
                    "AAC stream type should be 0x0F");
     TEST_ASSERT_EQ(static_cast<uint8_t>(StreamType::PRIVATE_DATA), 0x06,
                    "Private data stream type should be 0x06");
@@ -62,7 +62,7 @@ TEST(muxer_stream_config_default) {
     StreamConfig config;
 
     // Test default values
-    TEST_ASSERT_TRUE(config.type == StreamType::VIDEO_H264, "Default type should be H.264");
+    TEST_ASSERT_TRUE(config.type == StreamType::H264_VIDEO, "Default type should be H.264");
     TEST_ASSERT_EQ(config.pid, 0x100, "Default PID should be 0x100");
     TEST_ASSERT_EQ(config.stream_id, 0xE0, "Default stream_id should be 0xE0 (video)");
     TEST_ASSERT_EQ(config.bitrate, 4000000, "Default bitrate should be 4 Mbps");
@@ -74,13 +74,13 @@ TEST(muxer_stream_config_default) {
 
 TEST(muxer_stream_config_video) {
     StreamConfig config;
-    config.type = StreamType::VIDEO_H265;
+    config.type = StreamType::H265_VIDEO;
     config.pid = 0x200;
     config.width = 3840;
     config.height = 2160;
     config.frame_rate = 60;
 
-    TEST_ASSERT_TRUE(config.type == StreamType::VIDEO_H265, "Stream type should be H.265");
+    TEST_ASSERT_TRUE(config.type == StreamType::H265_VIDEO, "Stream type should be H.265");
     TEST_ASSERT_EQ(config.width, 3840, "Width should be 3840 (4K)");
     TEST_ASSERT_EQ(config.height, 2160, "Height should be 2160 (4K)");
     TEST_ASSERT_EQ(config.frame_rate, 60, "Frame rate should be 60 fps");
@@ -90,13 +90,13 @@ TEST(muxer_stream_config_video) {
 
 TEST(muxer_stream_config_audio) {
     StreamConfig config;
-    config.type = StreamType::AUDIO_AAC;
+    config.type = StreamType::AAC_AUDIO;
     config.pid = 0x201;
     config.stream_id = 0xC0;
     config.sample_rate = 48000;
     config.channels = 2;
 
-    TEST_ASSERT_TRUE(config.type == StreamType::AUDIO_AAC, "Stream type should be AAC");
+    TEST_ASSERT_TRUE(config.type == StreamType::AAC_AUDIO, "Stream type should be AAC");
     TEST_ASSERT_EQ(config.stream_id, 0xC0, "Stream ID should be 0xC0 (audio)");
     TEST_ASSERT_EQ(config.sample_rate, 48000, "Sample rate should be 48kHz");
     TEST_ASSERT_EQ(config.channels, 2, "Should have 2 channels");
@@ -147,26 +147,24 @@ TEST(muxer_config_custom) {
 // ============================================================================
 
 TEST(muxer_helpers_is_video_stream) {
-    TEST_ASSERT_TRUE(isVideoStream(StreamType::VIDEO_MPEG1), "MPEG-1 is video");
-    TEST_ASSERT_TRUE(isVideoStream(StreamType::VIDEO_MPEG2), "MPEG-2 is video");
-    TEST_ASSERT_TRUE(isVideoStream(StreamType::VIDEO_H264), "H.264 is video");
-    TEST_ASSERT_TRUE(isVideoStream(StreamType::VIDEO_H265), "H.265 is video");
+    TEST_ASSERT_TRUE(isVideoStream(StreamType::MPEG1_VIDEO), "MPEG-1 is video");
+    TEST_ASSERT_TRUE(isVideoStream(StreamType::MPEG2_VIDEO), "MPEG-2 is video");
+    TEST_ASSERT_TRUE(isVideoStream(StreamType::H264_VIDEO), "H.264 is video");
+    TEST_ASSERT_TRUE(isVideoStream(StreamType::H265_VIDEO), "H.265 is video");
 
-    TEST_ASSERT_FALSE(isVideoStream(StreamType::AUDIO_AAC), "AAC is not video");
-    TEST_ASSERT_FALSE(isVideoStream(StreamType::AUDIO_AC3), "AC-3 is not video");
+    TEST_ASSERT_FALSE(isVideoStream(StreamType::AAC_AUDIO), "AAC is not video");
     TEST_ASSERT_FALSE(isVideoStream(StreamType::PRIVATE_DATA), "Private is not video");
 
     return true;
 }
 
 TEST(muxer_helpers_is_audio_stream) {
-    TEST_ASSERT_TRUE(isAudioStream(StreamType::AUDIO_MPEG1), "MPEG-1 Audio is audio");
-    TEST_ASSERT_TRUE(isAudioStream(StreamType::AUDIO_MPEG2), "MPEG-2 Audio is audio");
-    TEST_ASSERT_TRUE(isAudioStream(StreamType::AUDIO_AAC), "AAC is audio");
-    TEST_ASSERT_TRUE(isAudioStream(StreamType::AUDIO_AAC_LATM), "AAC LATM is audio");
-    TEST_ASSERT_TRUE(isAudioStream(StreamType::AUDIO_AC3), "AC-3 is audio");
+    TEST_ASSERT_TRUE(isAudioStream(StreamType::MPEG1_AUDIO), "MPEG-1 Audio is audio");
+    TEST_ASSERT_TRUE(isAudioStream(StreamType::MPEG2_AUDIO), "MPEG-2 Audio is audio");
+    TEST_ASSERT_TRUE(isAudioStream(StreamType::AAC_AUDIO), "AAC is audio");
+    TEST_ASSERT_TRUE(isAudioStream(StreamType::MPEG4_AUDIO_LATM), "AAC LATM is audio");
 
-    TEST_ASSERT_FALSE(isAudioStream(StreamType::VIDEO_H264), "H.264 is not audio");
+    TEST_ASSERT_FALSE(isAudioStream(StreamType::H264_VIDEO), "H.264 is not audio");
     TEST_ASSERT_FALSE(isAudioStream(StreamType::PRIVATE_DATA), "Private is not audio");
 
     return true;
@@ -174,15 +172,15 @@ TEST(muxer_helpers_is_audio_stream) {
 
 TEST(muxer_helpers_get_default_stream_id) {
     // Video streams should get 0xE0
-    TEST_ASSERT_EQ(getDefaultStreamID(StreamType::VIDEO_H264), 0xE0,
+    TEST_ASSERT_EQ(getDefaultStreamID(StreamType::H264_VIDEO), 0xE0,
                    "Video should get stream ID 0xE0");
-    TEST_ASSERT_EQ(getDefaultStreamID(StreamType::VIDEO_H265), 0xE0,
+    TEST_ASSERT_EQ(getDefaultStreamID(StreamType::H265_VIDEO), 0xE0,
                    "Video should get stream ID 0xE0");
 
     // Audio streams should get 0xC0
-    TEST_ASSERT_EQ(getDefaultStreamID(StreamType::AUDIO_AAC), 0xC0,
+    TEST_ASSERT_EQ(getDefaultStreamID(StreamType::AAC_AUDIO), 0xC0,
                    "Audio should get stream ID 0xC0");
-    TEST_ASSERT_EQ(getDefaultStreamID(StreamType::AUDIO_AC3), 0xC0,
+    TEST_ASSERT_EQ(getDefaultStreamID(StreamType::MPEG1_AUDIO), 0xC0,
                    "Audio should get stream ID 0xC0");
 
     // Private streams should get 0xBD

@@ -2,6 +2,7 @@
 #define MPEGTS_MUXER_TYPES_HPP
 
 #include "mpegts_types.hpp"
+#include "mpegts_psi.hpp"  // For StreamType enum
 #include <functional>
 #include <cstdint>
 
@@ -21,27 +22,7 @@ constexpr size_t MAX_PRIVATE_DATA_SIZE = 182;     // Max private data per packet
 // Enumerations
 // ============================================================================
 
-/**
- * @brief Stream type identifiers (ISO/IEC 13818-1)
- */
-enum class StreamType : uint8_t {
-    // Video
-    VIDEO_MPEG1     = 0x01,  ///< MPEG-1 Video
-    VIDEO_MPEG2     = 0x02,  ///< MPEG-2 Video
-    VIDEO_H264      = 0x1B,  ///< H.264/AVC Video
-    VIDEO_H265      = 0x24,  ///< H.265/HEVC Video
-
-    // Audio
-    AUDIO_MPEG1     = 0x03,  ///< MPEG-1 Audio (Layer I, II)
-    AUDIO_MPEG2     = 0x04,  ///< MPEG-2 Audio
-    AUDIO_AAC       = 0x0F,  ///< AAC Audio (ADTS)
-    AUDIO_AAC_LATM  = 0x11,  ///< AAC Audio (LATM)
-    AUDIO_AC3       = 0x81,  ///< AC-3 Audio (Dolby Digital)
-
-    // Private/Data
-    PRIVATE_DATA    = 0x06,  ///< Private data streams
-    PRIVATE_PES     = 0x05   ///< Private PES packets
-};
+// StreamType is defined in mpegts_psi.hpp and reused here
 
 /**
  * @brief Muxing mode
@@ -92,7 +73,7 @@ struct StreamConfig {
      * @brief Default constructor
      */
     StreamConfig()
-        : type(StreamType::VIDEO_H264)
+        : type(StreamType::H264_VIDEO)
         , pid(0x100)
         , stream_id(0xE0)
         , bitrate(4000000)
@@ -156,21 +137,20 @@ using OutputCallback = std::function<void(const uint8_t* data, size_t length)>;
  * @brief Check if stream type is video
  */
 inline bool isVideoStream(StreamType type) {
-    return type == StreamType::VIDEO_MPEG1 ||
-           type == StreamType::VIDEO_MPEG2 ||
-           type == StreamType::VIDEO_H264 ||
-           type == StreamType::VIDEO_H265;
+    return type == StreamType::MPEG1_VIDEO ||
+           type == StreamType::MPEG2_VIDEO ||
+           type == StreamType::H264_VIDEO ||
+           type == StreamType::H265_VIDEO;
 }
 
 /**
  * @brief Check if stream type is audio
  */
 inline bool isAudioStream(StreamType type) {
-    return type == StreamType::AUDIO_MPEG1 ||
-           type == StreamType::AUDIO_MPEG2 ||
-           type == StreamType::AUDIO_AAC ||
-           type == StreamType::AUDIO_AAC_LATM ||
-           type == StreamType::AUDIO_AC3;
+    return type == StreamType::MPEG1_AUDIO ||
+           type == StreamType::MPEG2_AUDIO ||
+           type == StreamType::AAC_AUDIO ||
+           type == StreamType::MPEG4_AUDIO_LATM;
 }
 
 /**
