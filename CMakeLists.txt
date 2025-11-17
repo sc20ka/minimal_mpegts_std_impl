@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(minimal_mpegts_demuxer VERSION 0.1.0 LANGUAGES CXX)
+project(minimal_mpegts_std_impl VERSION 0.1.0 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)

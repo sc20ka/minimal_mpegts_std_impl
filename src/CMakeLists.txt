@@ -10,6 +10,7 @@ set(MPEGTS_SOURCES
 )
 
 set(MPEGTS_HEADERS
+    # Demuxer headers
     ${PROJECT_SOURCE_DIR}/include/mpegts_demuxer.hpp
     ${PROJECT_SOURCE_DIR}/include/mpegts_storage.hpp
     ${PROJECT_SOURCE_DIR}/include/mpegts_packet.hpp
@@ -17,6 +18,9 @@ set(MPEGTS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/mpegts_psi.hpp
     ${PROJECT_SOURCE_DIR}/include/mpegts_pcr.hpp
     ${PROJECT_SOURCE_DIR}/include/mpegts_pes.hpp
+    # Muxer headers
+    ${PROJECT_SOURCE_DIR}/include/mpegts_muxer.hpp
+    ${PROJECT_SOURCE_DIR}/include/mpegts_muxer_types.hpp
 )
 
 # Create static library

@@ -39,6 +39,10 @@ add_executable(test_pes
     test_pes.cpp
 )
 
+add_executable(test_muxer_basic
+    test_muxer_basic.cpp
+)
+
 # Link tests with library
 target_link_libraries(test_demuxer_basic PRIVATE
     mpegts_demuxer
@@ -70,6 +74,11 @@ target_link_libraries(test_pes PRIVATE
     test_utils
 )
 
+target_link_libraries(test_muxer_basic PRIVATE
+    mpegts_demuxer
+    test_utils
+)
+
 # Set output directory
 set_target_properties(
     test_demuxer_basic
@@ -78,6 +87,7 @@ set_target_properties(
     test_psi_tables
     test_pcr
     test_pes
+    test_muxer_basic
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
 )
@@ -90,3 +100,4 @@ add_test(NAME SynchronizationTests COMMAND test_synchronization)
 add_test(NAME PSITableTests COMMAND test_psi_tables)
 add_test(NAME PCRTests COMMAND test_pcr)
 add_test(NAME PESTests COMMAND test_pes)
+add_test(NAME BasicMuxerTests COMMAND test_muxer_basic)
