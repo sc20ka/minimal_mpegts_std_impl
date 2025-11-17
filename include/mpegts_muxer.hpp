@@ -246,11 +246,14 @@ private:
     // Components
     // ========================================================================
 
-    std::unique_ptr<StreamScheduler> scheduler_;
+    // Week 4: Only PSI Generator and Private Data Manager are implemented
     std::unique_ptr<PSIGenerator> psi_generator_;
-    std::unique_ptr<PCRInjector> pcr_injector_;
-    std::unique_ptr<BitrateController> bitrate_controller_;
     std::unique_ptr<PrivateDataManager> private_data_manager_;
+
+    // These will be added in future weeks:
+    // std::unique_ptr<StreamScheduler> scheduler_;       // Week 7
+    // std::unique_ptr<PCRInjector> pcr_injector_;        // Week 6
+    // std::unique_ptr<BitrateController> bitrate_controller_;  // Week 9
 
     // ========================================================================
     // Stream Context
@@ -262,9 +265,9 @@ private:
     struct StreamContext {
         uint16_t pid;                                    ///< Stream PID
         StreamConfig config;                             ///< Stream configuration
-        std::unique_ptr<PESPacketizer> pes_packetizer;   ///< PES packetizer
         std::unique_ptr<TSPacketBuilder> ts_builder;     ///< TS packet builder
-        std::queue<TSPacket> packet_buffer;              ///< Buffered packets
+        std::queue<std::vector<uint8_t>> packet_buffer;  ///< Buffered packets (188 bytes each)
+        // PES packetizer will be added in Week 5
     };
 
     std::map<uint16_t, StreamContext> streams_;
@@ -273,7 +276,7 @@ private:
     // Output Buffer
     // ========================================================================
 
-    std::vector<TSPacket> output_buffer_;
+    std::vector<std::vector<uint8_t>> output_buffer_;    ///< Output packets (188 bytes each)
     OutputCallback output_callback_;
 
     // ========================================================================
