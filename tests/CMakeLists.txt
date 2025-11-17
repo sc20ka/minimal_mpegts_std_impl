@@ -55,6 +55,10 @@ add_executable(test_muxer_stream_management
     test_muxer_stream_management.cpp
 )
 
+add_executable(test_pes_packetizer
+    test_pes_packetizer.cpp
+)
+
 # Link tests with library
 target_link_libraries(test_demuxer_basic PRIVATE
     mpegts_demuxer
@@ -106,6 +110,11 @@ target_link_libraries(test_muxer_stream_management PRIVATE
     test_utils
 )
 
+target_link_libraries(test_pes_packetizer PRIVATE
+    mpegts_demuxer
+    test_utils
+)
+
 # Set output directory
 set_target_properties(
     test_demuxer_basic
@@ -118,6 +127,7 @@ set_target_properties(
     test_ts_packet_builder
     test_psi_generator
     test_muxer_stream_management
+    test_pes_packetizer
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
 )
@@ -134,3 +144,4 @@ add_test(NAME BasicMuxerTests COMMAND test_muxer_basic)
 add_test(NAME TSPacketBuilderTests COMMAND test_ts_packet_builder)
 add_test(NAME PSIGeneratorTests COMMAND test_psi_generator)
 add_test(NAME MuxerStreamManagementTests COMMAND test_muxer_stream_management)
+add_test(NAME PESPacketizerTests COMMAND test_pes_packetizer)

@@ -12,6 +12,7 @@ set(MPEGTS_SOURCES
     mpegts_ts_packet_builder.cpp
     mpegts_psi_generator.cpp
     mpegts_private_data_manager.cpp
+    mpegts_pes_packetizer.cpp
     mpegts_muxer.cpp
 )
 
@@ -30,6 +31,7 @@ set(MPEGTS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/mpegts_ts_packet_builder.hpp
     ${PROJECT_SOURCE_DIR}/include/mpegts_psi_generator.hpp
     ${PROJECT_SOURCE_DIR}/include/mpegts_private_data_manager.hpp
+    ${PROJECT_SOURCE_DIR}/include/mpegts_pes_packetizer.hpp
 )
 
 # Create static library
