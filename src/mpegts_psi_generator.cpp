@@ -11,6 +11,8 @@ namespace mpegts {
 PSIGenerator::PSIGenerator()
     : transport_stream_id_(1)
     , pat_version_(0)
+    , pat_dirty_(false)
+    , pat_generated_(false)
 {
 }
 
@@ -27,12 +29,16 @@ void PSIGenerator::setProgramNumber(uint16_t program_number, uint16_t pmt_pid) {
     info.pmt_pid = pmt_pid;
     info.pcr_pid = 0x1FFF;  // Default: no PCR
     info.version = 0;
+    info.dirty = false;  // New program starts clean
 
     programs_[program_number] = info;
+    pat_dirty_ = true;  // PAT changed - needs version increment
 }
 
 void PSIGenerator::removeProgram(uint16_t program_number) {
-    programs_.erase(program_number);
+    if (programs_.erase(program_number) > 0) {
+        pat_dirty_ = true;  // PAT changed - needs version increment
+    }
 }
 
 void PSIGenerator::setPCRPID(uint16_t program_number, uint16_t pcr_pid) {
@@ -41,7 +47,10 @@ void PSIGenerator::setPCRPID(uint16_t program_number, uint16_t pcr_pid) {
         throw std::invalid_argument("Program not found");
     }
 
-    it->second.pcr_pid = pcr_pid;
+    if (it->second.pcr_pid != pcr_pid) {
+        it->second.pcr_pid = pcr_pid;
+        it->second.dirty = true;  // PMT changed - needs version increment
+    }
 }
 
 void PSIGenerator::addStream(uint16_t program_number, uint16_t elementary_pid,
@@ -52,12 +61,15 @@ void PSIGenerator::addStream(uint16_t program_number, uint16_t elementary_pid,
     }
 
     it->second.streams[elementary_pid] = stream_type;
+    it->second.dirty = true;  // PMT changed - needs version increment
 }
 
 void PSIGenerator::removeStream(uint16_t program_number, uint16_t elementary_pid) {
     auto it = programs_.find(program_number);
     if (it != programs_.end()) {
-        it->second.streams.erase(elementary_pid);
+        if (it->second.streams.erase(elementary_pid) > 0) {
+            it->second.dirty = true;  // PMT changed - needs version increment
+        }
     }
 }
 
@@ -74,8 +86,12 @@ void PSIGenerator::incrementPMTVersion(uint16_t program_number) {
 
 void PSIGenerator::resetVersions() {
     pat_version_ = 0;
+    pat_dirty_ = false;
+    pat_generated_ = false;
     for (auto& pair : programs_) {
         pair.second.version = 0;
+        pair.second.dirty = false;
+        pair.second.generated = false;
     }
 }
 
@@ -89,6 +105,12 @@ uint8_t PSIGenerator::getPMTVersion(uint16_t program_number) const {
 // ============================================================================
 
 std::vector<uint8_t> PSIGenerator::generatePAT() {
+    // Auto-increment version if PAT has changed (but only after first generation)
+    if (pat_dirty_ && pat_generated_) {
+        pat_version_ = (pat_version_ + 1) & 0x1F;  // 5-bit version
+        pat_dirty_ = false;
+    }
+
     std::vector<uint8_t> section;
 
     // Calculate section length
@@ -116,6 +138,10 @@ std::vector<uint8_t> PSIGenerator::generatePAT() {
     // Add CRC-32
     appendCRC32(section);
 
+    // Mark as generated and clear dirty flag
+    pat_generated_ = true;
+    pat_dirty_ = false;
+
     return section;
 }
 
@@ -129,7 +155,14 @@ std::vector<uint8_t> PSIGenerator::generatePMT(uint16_t program_number) {
         throw std::invalid_argument("Program not found");
     }
 
-    const ProgramInfo& info = it->second;
+    ProgramInfo& info = it->second;
+
+    // Auto-increment version if PMT has changed (but only after first generation)
+    if (info.dirty && info.generated) {
+        info.version = (info.version + 1) & 0x1F;  // 5-bit version
+        info.dirty = false;
+    }
+
     std::vector<uint8_t> section;
 
     // Calculate section length
@@ -175,6 +208,10 @@ std::vector<uint8_t> PSIGenerator::generatePMT(uint16_t program_number) {
 
     // Add CRC-32
     appendCRC32(section);
+
+    // Mark as generated and clear dirty flag
+    info.generated = true;
+    info.dirty = false;
 
     return section;
 }

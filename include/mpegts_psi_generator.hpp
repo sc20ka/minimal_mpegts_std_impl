@@ -166,6 +166,10 @@ private:
         uint16_t pcr_pid;                           ///< PCR PID
         std::map<uint16_t, mpegts::StreamType> streams; ///< PID -> StreamType
         uint8_t version;                            ///< PMT version number
+        bool dirty;                                 ///< PMT needs version increment
+        bool generated;                             ///< PMT has been generated at least once
+
+        ProgramInfo() : pmt_pid(0), pcr_pid(0x1FFF), version(0), dirty(false), generated(false) {}
     };
 
     // ========================================================================
@@ -175,6 +179,8 @@ private:
     uint16_t transport_stream_id_;                  ///< Transport stream ID
     std::map<uint16_t, ProgramInfo> programs_;      ///< Program number -> info
     uint8_t pat_version_;                           ///< PAT version number
+    bool pat_dirty_;                                ///< PAT needs version increment
+    bool pat_generated_;                            ///< PAT has been generated at least once
 
     // ========================================================================
     // Helper Methods
