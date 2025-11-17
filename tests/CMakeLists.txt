@@ -39,6 +39,30 @@ add_executable(test_pes
     test_pes.cpp
 )
 
+add_executable(test_muxer_basic
+    test_muxer_basic.cpp
+)
+
+add_executable(test_ts_packet_builder
+    test_ts_packet_builder.cpp
+)
+
+add_executable(test_psi_generator
+    test_psi_generator.cpp
+)
+
+add_executable(test_muxer_stream_management
+    test_muxer_stream_management.cpp
+)
+
+add_executable(test_pes_packetizer
+    test_pes_packetizer.cpp
+)
+
+add_executable(test_pcr_injector
+    test_pcr_injector.cpp
+)
+
 # Link tests with library
 target_link_libraries(test_demuxer_basic PRIVATE
     mpegts_demuxer
@@ -70,6 +94,36 @@ target_link_libraries(test_pes PRIVATE
     test_utils
 )
 
+target_link_libraries(test_muxer_basic PRIVATE
+    mpegts_demuxer
+    test_utils
+)
+
+target_link_libraries(test_ts_packet_builder PRIVATE
+    mpegts_demuxer
+    test_utils
+)
+
+target_link_libraries(test_psi_generator PRIVATE
+    mpegts_demuxer
+    test_utils
+)
+
+target_link_libraries(test_muxer_stream_management PRIVATE
+    mpegts_demuxer
+    test_utils
+)
+
+target_link_libraries(test_pes_packetizer PRIVATE
+    mpegts_demuxer
+    test_utils
+)
+
+target_link_libraries(test_pcr_injector PRIVATE
+    mpegts_demuxer
+    test_utils
+)
+
 # Set output directory
 set_target_properties(
     test_demuxer_basic
@@ -78,6 +132,12 @@ set_target_properties(
     test_psi_tables
     test_pcr
     test_pes
+    test_muxer_basic
+    test_ts_packet_builder
+    test_psi_generator
+    test_muxer_stream_management
+    test_pes_packetizer
+    test_pcr_injector
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
 )
@@ -90,3 +150,9 @@ add_test(NAME SynchronizationTests COMMAND test_synchronization)
 add_test(NAME PSITableTests COMMAND test_psi_tables)
 add_test(NAME PCRTests COMMAND test_pcr)
 add_test(NAME PESTests COMMAND test_pes)
+add_test(NAME BasicMuxerTests COMMAND test_muxer_basic)
+add_test(NAME TSPacketBuilderTests COMMAND test_ts_packet_builder)
+add_test(NAME PSIGeneratorTests COMMAND test_psi_generator)
+add_test(NAME MuxerStreamManagementTests COMMAND test_muxer_stream_management)
+add_test(NAME PESPacketizerTests COMMAND test_pes_packetizer)
+add_test(NAME PCRInjectorTests COMMAND test_pcr_injector)

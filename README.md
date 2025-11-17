@@ -2,17 +2,26 @@
 
 ## 📖 Project Description
 
-A minimalistic implementation of an MPEG-TS (ISO/IEC 13818-1) demultiplexer in C++17, created for educational purposes and practical application in transport stream processing tasks.
+A minimalistic implementation of MPEG-TS (ISO/IEC 13818-1) **Demultiplexer** and **Multiplexer** in C++17, created for educational purposes and practical application in transport stream processing tasks.
 
 ## 🎯 Purpose
 
-This project provides a clean, profile-agnostic implementation of an MPEG-TS demultiplexer focused on:
+This project provides a clean, profile-agnostic implementation of MPEG-TS tools focused on:
 
+### Demuxer (COMPLETE)
 - **Stream processing** of MPEG-TS data with high reliability
 - **Adaptive synchronization** in conditions with noise and garbage data
 - **Recovery** of valid packets from arbitrary data
 - **Separation** of main payload and private data
 - **Management** of multiple programs and streams simultaneously
+
+### Muxer (PLANNED)
+- **Multiplexing** multiple elementary streams into transport stream
+- **PSI generation** (PAT/PMT) for program structure
+- **PCR injection** for timing synchronization
+- **PES packetization** from raw elementary streams
+- **Bitrate control** (CBR/VBR modes)
+- **Private data support** - metadata and auxiliary information insertion
 
 ## ⚠️ Current Development Stage
 
@@ -40,17 +49,75 @@ The project has completed **Phase 2: Advanced Features** with comprehensive MPEG
 - ✅ **Stream type detection** - automatic video/audio stream identification
 - ✅ **Multi-packet accumulation** - handles sections/packets spanning multiple TS packets
 
-### 📋 Planned (Phase 3)
+### 📋 Planned (Phase 3 - Demuxer Optimization)
 
-- ⏳ Performance optimizations - SIMD, zero-copy operations
-- ⏳ Multi-threading support - parallel stream processing
-- ⏳ DVB-specific functions (optional) - service descriptors, EIT
-- ⏳ Real-time statistics - bitrate, jitter, continuity errors
-- ⏳ Advanced error handling - enhanced recovery strategies
+- ⏳ **Performance optimizations** - SIMD, zero-copy operations
+- ⏳ **Multi-threading support** - parallel stream processing
+- ⏳ **DVB-specific functions** (optional) - service descriptors, EIT
+- ⏳ **Real-time statistics** - bitrate, jitter, continuity errors
+- ⏳ **Advanced error handling** - enhanced recovery strategies
+
+### 🚀 In Progress (Phase 4 - MPEG-TS Muxer)
+
+**Target: 16-week development cycle**
+**Current Progress: Week 2/16 (12.5%)**
+**Last Updated:** November 17, 2025
+
+#### Phase 4.1: Foundation (Weeks 1-4) - IN PROGRESS
+
+##### ✅ Week 1: Core Infrastructure (COMPLETED)
+- ✅ **Core infrastructure** - muxer types and skeleton
+  - `mpegts_muxer_types.hpp` (210 lines): StreamConfig, MuxerConfig, enums
+  - `mpegts_muxer.hpp` (324 lines): MPEGTSMuxer class skeleton with full API
+  - 12 unit tests passing
+  - **Commit:** c27b5b8
+
+##### ✅ Week 2: TS Packet Builder (COMPLETED)
+- ✅ **TS Packet Builder** - construct valid 188-byte packets
+  - `mpegts_ts_packet_builder.hpp/cpp` (458 lines total)
+  - Continuity counter management (0-15 auto-increment with wrap)
+  - Adaptation field with PCR, private data, flags
+  - Multi-packet splitting, stuffing bytes, NULL packets
+  - **27/27 unit tests passing** (target: 25+, achieved 108%)
+  - **Commit:** 9df6ae7
+
+##### ⏳ Week 3: PSI Generator (NEXT)
+- ⏳ **PSI Generator** - create PAT/PMT tables with CRC-32
+  - PAT/PMT generation
+  - Section wrapping, version numbering
+  - Target: 30+ unit tests
+
+##### ⏳ Week 4: Basic Stream Management
+- ⏳ **Basic stream management** - single stream muxing
+  - Stream registration, PID management
+  - Integration tests
+
+#### Phase 4.2: Multi-Stream & PES (Weeks 5-8)
+- ⏳ **PES Packetizer** - elementary stream → PES packets
+- ⏳ **PCR Injection** - Program Clock Reference with 40ms interval
+- ⏳ **Stream Scheduler** - priority-based multi-stream scheduling
+- ⏳ **Integration tests** - validate with demuxer
+
+#### Phase 4.3: Bitrate Control (Weeks 9-12)
+- ⏳ **BitrateController** - CBR/VBR modes
+- ⏳ **NULL packet insertion** - maintain constant bitrate
+- ⏳ **Stream synchronization** - A/V sync within ±40ms
+- ⏳ **Performance optimization** - meet 50 Mbps target
+
+#### Phase 4.4: Polish (Weeks 13-16)
+- ⏳ **Additional codecs** - H.265, MP3, AC-3
+- ⏳ **Examples & tools** - command-line muxer utility
+- ⏳ **Comprehensive testing** - compliance & stress tests
+- ⏳ **Documentation** - API reference and user guide
+
+**See detailed plans in:**
+- `ideas/muxer_design.md` - Architecture and design
+- `ideas/muxer_roadmap.md` - Week-by-week development plan
+- `ideas/todo.md` - Technical specifications and tasks
 
 ## 🏗️ Architecture
 
-### Key Components
+### Demuxer Architecture (Implemented)
 
 ```
 ┌─────────────────────────────────────────┐
@@ -89,8 +156,53 @@ The project has completed **Phase 2: Advanced Features** with comprehensive MPEG
 └─────────────────────────────────────────┘
 ```
 
+### Muxer Architecture (Planned)
+
+```
+┌─────────────────────────────────────────┐
+│  Elementary Streams (H.264, AAC, etc.)  │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│  PES Packetizer                         │
+│  - PTS/DTS generation                   │
+│  - Stream-specific headers              │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│  TS Packet Builder                      │
+│  - PES → 188-byte packets               │
+│  - Continuity counter                   │
+│  - Adaptation field                     │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│  Multiplexer Core                       │
+│  - Stream scheduling                    │
+│  - PSI injection (PAT/PMT)              │
+│  - PCR injection (40ms)                 │
+│  - Bitrate control                      │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│  Output Buffer                          │
+│  - CBR/VBR modes                        │
+│  - NULL packet padding                  │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│  MPEG-TS Stream Output                  │
+└─────────────────────────────────────────┘
+```
+
 ## 🛠️ Technical Specifications
 
+### Demuxer
 | Parameter                 | Value                               |
 | ------------------------- | ----------------------------------- |
 | Language                  | C++17                               |
@@ -102,6 +214,21 @@ The project has completed **Phase 2: Advanced Features** with comprehensive MPEG
 | Private data              | Full support                        |
 | Scrambled content         | NOT supported                       |
 | Profiles                  | Profile-agnostic                    |
+
+### Muxer (Planned)
+| Parameter                 | Value                               |
+| ------------------------- | ----------------------------------- |
+| Language                  | C++17                               |
+| Standard                  | ISO/IEC 13818-1 (MPEG-TS)           |
+| Packet size               | 188 bytes                           |
+| Max bitrate               | 50 Mbps                             |
+| Concurrent streams        | 8 streams                           |
+| PCR interval              | 40ms (configurable)                 |
+| PAT/PMT interval          | 100ms (configurable)                |
+| Modes                     | CBR, VBR                            |
+| Latency target            | < 100ms                             |
+| Video codecs              | H.264, H.265                        |
+| Audio codecs              | AAC, MP3, AC-3                      |
 
 ## 📦 Building the Project
 
