@@ -1,12 +1,15 @@
 # Source files for MPEG-TS Demuxer library
 
 set(MPEGTS_SOURCES
+    # Demuxer sources
     mpegts_demuxer.cpp
     mpegts_storage.cpp
     mpegts_packet.cpp
     mpegts_psi.cpp
     mpegts_pcr.cpp
     mpegts_pes.cpp
+    # Muxer sources
+    mpegts_ts_packet_builder.cpp
 )
 
 set(MPEGTS_HEADERS
@@ -21,6 +24,7 @@ set(MPEGTS_HEADERS
     # Muxer headers
     ${PROJECT_SOURCE_DIR}/include/mpegts_muxer.hpp
     ${PROJECT_SOURCE_DIR}/include/mpegts_muxer_types.hpp
+    ${PROJECT_SOURCE_DIR}/include/mpegts_ts_packet_builder.hpp
 )
 
 # Create static library
