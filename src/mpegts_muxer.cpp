@@ -1,6 +1,7 @@
 #include "mpegts_muxer.hpp"
 #include "mpegts_ts_packet_builder.hpp"
 #include "mpegts_psi_generator.hpp"
+#include "mpegts_pes_packetizer.hpp"
 #include "mpegts_private_data_manager.hpp"
 #include <stdexcept>
 #include <cstring>
@@ -54,6 +55,9 @@ uint16_t MPEGTSMuxer::addStream(const StreamConfig& config) {
     // Create TS packet builder for this stream
     context.ts_builder = std::make_unique<TSPacketBuilder>(config.pid);
 
+    // Create PES packetizer for this stream
+    context.pes_packetizer = std::make_unique<PESPacketizer>(config.stream_id);
+
     // Add stream to PSI
     psi_generator_->addStream(config_.program_number, config.pid, config.type);
 
@@ -99,19 +103,21 @@ void MPEGTSMuxer::feedElementaryData(uint16_t pid,
         throw std::invalid_argument("Stream PID not found");
     }
 
-    // For Week 4: Simple implementation
-    // Just store data with timestamps for now
-    // PES packetization will be added in Week 5
+    // Week 5: Create PES packet from elementary stream data
+    // Convert ES data to PES packet with PTS/DTS
+    auto pes_packet = it->second.pes_packetizer->createPESPacket(
+        data, length, pts, dts, true);  // data_alignment = true
 
-    // Build simple TS packets with the data using TSPacketBuilder
+    // Convert PES packet to TS packets
     BuildOptions options;
-    options.pusi = true;  // First packet has PUSI
+    options.pusi = true;  // First packet has PUSI (contains PES header)
     options.has_pcr = false;  // PCR will be added in Week 6
 
-    auto packets = it->second.ts_builder->build(data, length, options);
+    auto ts_packets = it->second.ts_builder->build(
+        pes_packet.data(), pes_packet.size(), options);
 
-    // Add packets to stream buffer (store as raw bytes)
-    for (const auto& packet : packets) {
+    // Add TS packets to stream buffer
+    for (const auto& packet : ts_packets) {
         it->second.packet_buffer.push(packet);
     }
 }

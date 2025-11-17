@@ -263,11 +263,11 @@ private:
      * @brief Per-stream context
      */
     struct StreamContext {
-        uint16_t pid;                                    ///< Stream PID
-        StreamConfig config;                             ///< Stream configuration
-        std::unique_ptr<TSPacketBuilder> ts_builder;     ///< TS packet builder
-        std::queue<std::vector<uint8_t>> packet_buffer;  ///< Buffered packets (188 bytes each)
-        // PES packetizer will be added in Week 5
+        uint16_t pid;                                      ///< Stream PID
+        StreamConfig config;                               ///< Stream configuration
+        std::unique_ptr<TSPacketBuilder> ts_builder;       ///< TS packet builder
+        std::unique_ptr<PESPacketizer> pes_packetizer;     ///< PES packetizer
+        std::queue<std::vector<uint8_t>> packet_buffer;    ///< Buffered packets (188 bytes each)
     };
 
     std::map<uint16_t, StreamContext> streams_;
