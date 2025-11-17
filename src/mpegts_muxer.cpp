@@ -3,6 +3,7 @@
 #include "mpegts_psi_generator.hpp"
 #include "mpegts_pes_packetizer.hpp"
 #include "mpegts_private_data_manager.hpp"
+#include "mpegts_pcr_injector.hpp"
 #include <stdexcept>
 #include <cstring>
 
@@ -24,9 +25,11 @@ MPEGTSMuxer::MPEGTSMuxer(const MuxerConfig& config)
     // Initialize Private Data Manager
     private_data_manager_ = std::make_unique<PrivateDataManager>();
 
+    // Initialize PCR Injector (Week 6)
+    pcr_injector_ = std::make_unique<PCRInjector>(config_.pcr_interval_ms);
+
     // Other components will be initialized in future weeks
     // scheduler_ will be added in Week 7
-    // pcr_injector_ will be added in Week 6
     // bitrate_controller_ will be added in Week 9
 }
 
@@ -108,10 +111,26 @@ void MPEGTSMuxer::feedElementaryData(uint16_t pid,
     auto pes_packet = it->second.pes_packetizer->createPESPacket(
         data, length, pts, dts, true);  // data_alignment = true
 
-    // Convert PES packet to TS packets
+    // Week 6: Check if we should inject PCR
     BuildOptions options;
     options.pusi = true;  // First packet has PUSI (contains PES header)
-    options.has_pcr = false;  // PCR will be added in Week 6
+    options.has_pcr = false;
+
+    // Only inject PCR on the designated PCR PID
+    if (pid == config_.pcr_pid && pts != NO_DTS && pcr_injector_) {
+        if (pcr_injector_->shouldInjectPCR(pts)) {
+            // Calculate PCR from PTS
+            PCR pcr = PCRInjector::calculatePCR(pts);
+
+            // Convert PCR to 27MHz value for TSPacketBuilder
+            // PCR_value = PCR_base * 300 + PCR_extension
+            options.has_pcr = true;
+            options.pcr_value = pcr.getValue27MHz();
+
+            // Record the injection
+            pcr_injector_->recordInjection(pts);
+        }
+    }
 
     auto ts_packets = it->second.ts_builder->build(
         pes_packet.data(), pes_packet.size(), options);
@@ -179,6 +198,9 @@ void MPEGTSMuxer::setPCRPID(uint16_t pid) {
 
 void MPEGTSMuxer::setPCRInterval(uint32_t interval_ms) {
     config_.pcr_interval_ms = interval_ms;
+    if (pcr_injector_) {
+        pcr_injector_->setInterval(interval_ms);
+    }
 }
 
 // ============================================================================

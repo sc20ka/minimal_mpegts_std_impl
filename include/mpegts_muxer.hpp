@@ -246,13 +246,13 @@ private:
     // Components
     // ========================================================================
 
-    // Week 4: Only PSI Generator and Private Data Manager are implemented
+    // Week 4-6: PSI Generator, Private Data Manager, and PCR Injector implemented
     std::unique_ptr<PSIGenerator> psi_generator_;
     std::unique_ptr<PrivateDataManager> private_data_manager_;
+    std::unique_ptr<PCRInjector> pcr_injector_;        // Week 6
 
     // These will be added in future weeks:
     // std::unique_ptr<StreamScheduler> scheduler_;       // Week 7
-    // std::unique_ptr<PCRInjector> pcr_injector_;        // Week 6
     // std::unique_ptr<BitrateController> bitrate_controller_;  // Week 9
 
     // ========================================================================
