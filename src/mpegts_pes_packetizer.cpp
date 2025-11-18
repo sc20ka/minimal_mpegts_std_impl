@@ -25,12 +25,22 @@ std::vector<uint8_t> PESPacketizer::createPESPacket(
     uint64_t pts, uint64_t dts,
     bool data_alignment)
 {
+    // Validate input data
+    if (es_data == nullptr && es_size > 0) {
+        throw std::invalid_argument("es_data is null but es_size is non-zero");
+    }
+
     // Validate timestamps
     if (pts != NO_DTS && !isValidTimestamp(pts)) {
         throw std::invalid_argument("PTS exceeds 33-bit range");
     }
     if (dts != NO_DTS && !isValidTimestamp(dts)) {
         throw std::invalid_argument("DTS exceeds 33-bit range");
+    }
+
+    // Validate PTS/DTS relationship: DTS must be <= PTS
+    if (pts != NO_DTS && dts != NO_DTS && dts > pts) {
+        throw std::invalid_argument("DTS cannot be greater than PTS");
     }
 
     // For video streams (0xE0-0xEF), packet_length can be 0 (unbounded)
@@ -52,11 +62,17 @@ std::vector<uint8_t> PESPacketizer::createPESPacket(
     // Update packet length field for non-video streams
     if (!is_video && payload_size > 0) {
         // packet_length = header_size (after first 6 bytes) + payload_size
-        uint16_t packet_length = (header.size() - 6) + es_size;
-        if (packet_length > 65535) {
-            throw std::invalid_argument("PES packet too large for audio stream");
+        // Check BEFORE casting to uint16_t to detect overflow
+        size_t total_length = (header.size() - 6) + es_size;
+        if (total_length > 65535) {
+            throw std::invalid_argument("PES packet too large for audio stream (max 65535 bytes after header)");
         }
-        write16(pes_packet, packet_length);  // Update bytes 4-5
+        uint16_t packet_length = static_cast<uint16_t>(total_length);
+
+        // CRITICAL FIX: Update bytes 4-5 directly instead of appending
+        // Bytes 4-5 contain PES_packet_length field
+        pes_packet[4] = (packet_length >> 8) & 0xFF;
+        pes_packet[5] = packet_length & 0xFF;
     }
 
     return pes_packet;
@@ -68,6 +84,22 @@ std::vector<std::vector<uint8_t>> PESPacketizer::createPESPackets(
     uint64_t pts, uint64_t dts,
     bool data_alignment)
 {
+    // IMPORTANT NOTE: This method creates MULTIPLE independent PES packets,
+    // NOT a single fragmented PES packet. Each packet has its own PES header
+    // (except timestamps are only in the first packet).
+    //
+    // This is NOT standard MPEG-TS fragmentation where one large PES packet
+    // is split across multiple TS packets. Instead, this splits elementary
+    // stream data into multiple small PES packets.
+    //
+    // For standard TS packet fragmentation, use createPESPacket() followed
+    // by TSPacketBuilder::build() which handles proper TS-level fragmentation.
+
+    // Validate input data
+    if (es_data == nullptr && es_size > 0) {
+        throw std::invalid_argument("es_data is null but es_size is non-zero");
+    }
+
     std::vector<std::vector<uint8_t>> packets;
 
     // Calculate header size
