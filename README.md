@@ -15,19 +15,21 @@ This project provides a clean, profile-agnostic implementation of MPEG-TS tools 
 - **Separation** of main payload and private data
 - **Management** of multiple programs and streams simultaneously
 
-### Muxer (PLANNED)
-- **Multiplexing** multiple elementary streams into transport stream
-- **PSI generation** (PAT/PMT) for program structure
-- **PCR injection** for timing synchronization
-- **PES packetization** from raw elementary streams
-- **Bitrate control** (CBR/VBR modes)
-- **Private data support** - metadata and auxiliary information insertion
+### Muxer (IN PROGRESS - 37.5% Complete)
+- ✅ **TS packet building** - construct valid 188-byte MPEG-TS packets
+- ✅ **PSI generation** (PAT/PMT) - program structure with CRC-32 validation
+- ✅ **PCR injection** - timing synchronization with configurable intervals
+- ✅ **PES packetization** - convert elementary streams to PES packets with PTS/DTS
+- ✅ **Private data support** - metadata and auxiliary information insertion
+- ⏳ **Stream scheduling** - multi-stream coordination (NEXT)
+- ⏳ **Bitrate control** - CBR/VBR modes (PLANNED)
+- ⏳ **Multi-stream multiplexing** - complete integration (PLANNED)
 
 ## ⚠️ Current Development Stage
 
-**BETA v0.2.0 - Advanced Features Complete**
+**BETA v0.3.0 - Demuxer Complete + Muxer Core Components**
 
-The project has completed **Phase 2: Advanced Features** with comprehensive MPEG-TS support!
+The project has completed **Phase 1 & 2: Full Demuxer** with comprehensive MPEG-TS support, and is progressing through **Phase 4: MPEG-TS Muxer** with core building blocks complete!
 
 ### ✅ Implemented (Phase 1 - COMPLETE)
 
@@ -60,43 +62,74 @@ The project has completed **Phase 2: Advanced Features** with comprehensive MPEG
 ### 🚀 In Progress (Phase 4 - MPEG-TS Muxer)
 
 **Target: 16-week development cycle**
-**Current Progress: Week 2/16 (12.5%)**
-**Last Updated:** November 17, 2025
+**Current Progress: Week 6/16 (37.5%)**
+**Last Updated:** November 18, 2025
 
-#### Phase 4.1: Foundation (Weeks 1-4) - IN PROGRESS
+#### Phase 4.1: Foundation (Weeks 1-4) - ✅ COMPLETE
 
 ##### ✅ Week 1: Core Infrastructure (COMPLETED)
 - ✅ **Core infrastructure** - muxer types and skeleton
-  - `mpegts_muxer_types.hpp` (210 lines): StreamConfig, MuxerConfig, enums
-  - `mpegts_muxer.hpp` (324 lines): MPEGTSMuxer class skeleton with full API
-  - 12 unit tests passing
+  - `mpegts_muxer_types.hpp` (172 lines): StreamConfig, MuxerConfig, enums
+  - `mpegts_muxer.hpp` (322 lines): MPEGTSMuxer class skeleton with full API
+  - **12/12 unit tests passing**
   - **Commit:** c27b5b8
 
 ##### ✅ Week 2: TS Packet Builder (COMPLETED)
 - ✅ **TS Packet Builder** - construct valid 188-byte packets
-  - `mpegts_ts_packet_builder.hpp/cpp` (458 lines total)
+  - `mpegts_ts_packet_builder.hpp/cpp` (450 lines total)
   - Continuity counter management (0-15 auto-increment with wrap)
   - Adaptation field with PCR, private data, flags
   - Multi-packet splitting, stuffing bytes, NULL packets
   - **27/27 unit tests passing** (target: 25+, achieved 108%)
   - **Commit:** 9df6ae7
 
-##### ⏳ Week 3: PSI Generator (NEXT)
-- ⏳ **PSI Generator** - create PAT/PMT tables with CRC-32
-  - PAT/PMT generation
+##### ✅ Week 3: PSI Generator (COMPLETED)
+- ✅ **PSI Generator** - create PAT/PMT tables with CRC-32
+  - `mpegts_psi_generator.hpp/cpp` (217 lines)
+  - PAT/PMT generation with CRC-32 validation
   - Section wrapping, version numbering
-  - Target: 30+ unit tests
+  - Multi-stream PMT support
+  - **27/27 unit tests passing** (target: 30+, achieved 90%)
 
-##### ⏳ Week 4: Basic Stream Management
-- ⏳ **Basic stream management** - single stream muxing
+##### ✅ Week 4: Basic Stream Management (COMPLETED)
+- ✅ **Basic stream management** - stream registration and control
   - Stream registration, PID management
-  - Integration tests
+  - Configuration methods (bitrate, intervals)
+  - Private data management integration
+  - **23/23 unit tests passing**
 
-#### Phase 4.2: Multi-Stream & PES (Weeks 5-8)
-- ⏳ **PES Packetizer** - elementary stream → PES packets
-- ⏳ **PCR Injection** - Program Clock Reference with 40ms interval
+#### Phase 4.2: Multi-Stream & PES (Weeks 5-8) - IN PROGRESS
+
+##### ✅ Week 5: PES Packetizer (COMPLETED)
+- ✅ **PES Packetizer** - elementary stream → PES packets
+  - `mpegts_pes_packetizer.hpp/cpp` (152 lines)
+  - PTS/DTS encoding (33-bit, 90kHz)
+  - Stream ID management per stream type
+  - Unbounded packets for video (packet_length = 0)
+  - Data alignment indicator support
+  - **21/21 unit tests passing**
+
+##### ✅ Week 6: PCR Injection (COMPLETED)
+- ✅ **PCR Injector** - Program Clock Reference generation
+  - `mpegts_pcr_injector.hpp/cpp` (141 lines)
+  - PCR calculation from timestamps (27 MHz)
+  - Configurable injection interval (default 40ms)
+  - Timing accuracy tracking
+  - Discontinuity handling
+  - **24/24 unit tests passing**
+
+##### ⏳ Week 7: Stream Scheduler (NEXT)
 - ⏳ **Stream Scheduler** - priority-based multi-stream scheduling
-- ⏳ **Integration tests** - validate with demuxer
+  - Round-robin with priority
+  - Buffer level tracking
+  - PSI/PCR priority handling
+  - Target: 25+ unit tests
+
+##### ⏳ Week 8: Integration Testing
+- ⏳ **Integration tests** - validate complete muxing pipeline
+  - Multi-stream muxing validation
+  - Demuxer round-trip testing
+  - Target: 15+ integration tests
 
 #### Phase 4.3: Bitrate Control (Weeks 9-12)
 - ⏳ **BitrateController** - CBR/VBR modes
@@ -347,21 +380,41 @@ The project includes a comprehensive test suite:
 cmake -DBUILD_TESTS=ON ..
 cmake --build .
 
-# Run test suites
+# Run demuxer test suites
 ./tests/test_demuxer_basic       # 7/7 basic functionality tests
 ./tests/test_psi_tables          # 6/6 PSI table parsing tests
 ./tests/test_pcr                 # 13/13 PCR processing tests
 ./tests/test_pes                 # 18/18 PES decoding tests
 ./tests/test_demuxer_scenarios   # Scenario tests with garbage
 ./tests/test_synchronization     # Sync algorithm edge cases
+
+# Run muxer test suites
+./tests/test_muxer_basic              # 12/12 core infrastructure tests
+./tests/test_ts_packet_builder        # 27/27 packet builder tests
+./tests/test_psi_generator            # 27/27 PSI generation tests
+./tests/test_pes_packetizer           # 21/21 PES packetizer tests
+./tests/test_pcr_injector             # 24/24 PCR injector tests
+./tests/test_muxer_stream_management  # 23/23 stream management tests
+
+# Or run all with CTest
+ctest
 ```
 
-**Test Coverage (44/44 passing):**
+**Test Coverage (178/178 core tests passing - 100%):**
+
+**Demuxer Tests (44/44):**
 - ✅ Core Demuxing (7 tests) - packet validation, synchronization, multi-PID, payload extraction
 - ✅ PSI Tables (6 tests) - PAT/PMT parsing, CRC-32 validation, section accumulation
 - ✅ PCR Processing (13 tests) - extraction, tracking, interpolation, jitter detection
 - ✅ PES Decoding (18 tests) - header parsing, PTS/DTS extraction, packet accumulation
-- ✅ Synthetic packet generation with controlled garbage
+
+**Muxer Tests (134/134):**
+- ✅ Core Infrastructure (12 tests) - muxer types, configuration, basic API
+- ✅ TS Packet Builder (27 tests) - packet construction, continuity counter, adaptation field
+- ✅ PSI Generator (27 tests) - PAT/PMT generation, CRC-32, section wrapping
+- ✅ PES Packetizer (21 tests) - PES header, PTS/DTS encoding, stream ID management
+- ✅ PCR Injector (24 tests) - PCR calculation, timing accuracy, interval control
+- ✅ Stream Management (23 tests) - stream registration, configuration, private data
 
 ## 📄 Documentation
 
@@ -379,18 +432,20 @@ The project is in early development stage. Contributions are welcome after core 
 
 ## ⚡ Status
 
-- **Version:** 0.2.0-beta
-- **Status:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 Planned ⏳
-- **Test Coverage:** 44/44 core tests passing (100%)
-- **Last updated:** November 2025
+- **Version:** 0.3.0-beta
+- **Demuxer Status:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 Planned ⏳
+- **Muxer Status:** Phase 4.1 Complete ✅ | Phase 4.2 In Progress (Week 6/16 - 37.5%)
+- **Test Coverage:** 178/178 core tests passing (100%)
+- **Last updated:** November 18, 2025
 
 ### Recent Updates
 
-- ✅ **Phase 2 COMPLETE** - PAT/PMT, PCR, and PES fully implemented
-- ✅ **PES decoding added** - PTS/DTS timestamps, stream type detection
-- ✅ **PCR processing added** - clock reference tracking and interpolation
-- ✅ **PAT/PMT parsing complete** - program table analysis with CRC-32
-- ✅ **Enhanced test coverage** - 44 comprehensive tests across all modules
+- ✅ **Muxer Week 6 COMPLETE** - PCR Injector with 24/24 tests passing
+- ✅ **Muxer Week 5 COMPLETE** - PES Packetizer with 21/21 tests passing
+- ✅ **Muxer Week 4 COMPLETE** - Basic Stream Management with 23/23 tests passing
+- ✅ **Muxer Week 3 COMPLETE** - PSI Generator (PAT/PMT) with 27/27 tests passing
+- ✅ **Phase 4.1 Foundation COMPLETE** - All core muxer building blocks implemented
+- ✅ **134 muxer tests passing** - comprehensive coverage of all components
 
 ---
 
